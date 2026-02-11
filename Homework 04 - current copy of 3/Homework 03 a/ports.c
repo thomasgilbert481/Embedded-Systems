@@ -132,7 +132,7 @@ void Init_Ports(void){ //Init all ports
                  P3SEL0 &= ~TEST_PROBE; //  GPIO operation
                  P3SEL1 &= ~TEST_PROBE; //  GPIO operation
                  P3OUT &= ~TEST_PROBE; // Initial Value = Low / Off
-                 P3DIR &= ~TEST_PROBE; // Direction = output
+                 P3DIR |= TEST_PROBE; // Direction = output
 
                  P3SEL0 &= ~OA2O; //  GPIO operation
                  P3SEL1 &= ~OA2O; //  GPIO operation
@@ -243,7 +243,7 @@ void Init_Ports(void){ //Init all ports
                     //------------------------------------------------------------------------------
                    }
 
-void Init_Port6(void){
+    void Init_Port6(void){
         P6OUT = 0x00;
         P6DIR = 0x00; //direction to OUTPUT
 
@@ -289,5 +289,4 @@ void Init_Port6(void){
         P6OUT &= ~GRN_LED;
         P6DIR |= GRN_LED;            // Output
     }
-
 
