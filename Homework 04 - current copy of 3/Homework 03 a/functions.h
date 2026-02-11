@@ -136,5 +136,17 @@ void Wheels_Forward(void);
 void Wheels_Off(void);
 void Wheels_test(void);
 
+//Project 4 functions
+// Shape control functions
+void Forward_On(void);
+void Forward_Off(void);
+void Forward_Move(void);
+void Update_Timers(void);
+void Run_Shapes(void);
+void Run_Circle(void);
+void Run_Figure8(void);
+void Run_Triangle(void);
+void Start_Shape(char shape);
+
 
 
