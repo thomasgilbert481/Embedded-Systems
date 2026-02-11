@@ -243,45 +243,51 @@ void Init_Ports(void){ //Init all ports
                     //------------------------------------------------------------------------------
                    }
 
- void Init_Port6(void){ // Configure Port 6
-                    //------------------------------------------------------------------------------
-                     P6OUT = 0x00; // P6 set Low
-                     P6DIR = 0x01; // Set P6 direction to input
+void Init_Port6(void){
+        P6OUT = 0x00;
+        P6DIR = 0x00; //direction to OUTPUT
 
-                     P6SEL0 &= ~LCD_BACKLITE; //  GPIO operation
-                     P6SEL1 &= ~LCD_BACKLITE; //  GPIO operation
-                     P6OUT |= LCD_BACKLITE; // Initial Value = Low / Off
-                     P6DIR |= LCD_BACKLITE; // Direction = output
+        // LCD Backlight
+        P6SEL0 &= ~LCD_BACKLITE;
+        P6SEL1 &= ~LCD_BACKLITE;
+        P6OUT &= ~LCD_BACKLITE;       // Backlight OFF (save battery)
+        P6DIR |= LCD_BACKLITE;       // Output
 
-                     P6SEL0 &= ~R_FORWARD; //  GPIO operation
-                     P6SEL1 &= ~R_FORWARD; //  GPIO operation
-                     P6OUT &=  ~R_FORWARD; // Initial Value = Low / Off
-                     P6DIR &= ~R_FORWARD; // Direction = output
+        // Right Forward Motor
+        P6SEL0 &= ~R_FORWARD;
+        P6SEL1 &= ~R_FORWARD;
+        P6OUT &= ~R_FORWARD;         // Initially OFF
+        P6DIR |= R_FORWARD;          // *** OUTPUT ***
 
-                     P6SEL0 &= ~L_FORWARD; // Set Select 0 For GP I/O
-                     P6SEL1 &= ~L_FORWARD; // Set Select 0 For GP I/O
-                     P6OUT &= ~L_FORWARD; // Set Port pin Low [Wheel Off]
-                     P6DIR &= ~L_FORWARD; // Set Direction to Output
+        // Left Forward Motor
+        P6SEL0 &= ~L_FORWARD;
+        P6SEL1 &= ~L_FORWARD;
+        P6OUT &= ~L_FORWARD;         // Initially OFF
+        P6DIR |= L_FORWARD;          // *** OUTPUT ***
 
-                     P6SEL0 &= ~R_REVERSE; //  Operation
-                     P6SEL1 &= ~R_REVERSE; //  Operation
-                     P6OUT &= ~R_REVERSE; // Configure pullup resistor
-                     P6DIR &= ~R_REVERSE; // Direction = input
+        // Right Reverse Motor
+        P6SEL0 &= ~R_REVERSE;
+        P6SEL1 &= ~R_REVERSE;
+        P6OUT &= ~R_REVERSE;         // OFF
+        P6DIR |= R_REVERSE;          // *** OUTPUT ***
 
-                     P6SEL0 &= ~L_REVERSE; //  GPIO operation
-                     P6SEL1 &= ~L_REVERSE; //  GPIO operation
-                     P6OUT &= ~L_REVERSE; // Initial Value = Low / Off
-                     P6DIR &= ~L_REVERSE; // Direction = input
+        // Left Reverse Motor
+        P6SEL0 &= ~L_REVERSE;
+        P6SEL1 &= ~L_REVERSE;
+        P6OUT &= ~L_REVERSE;         // OFF
+        P6DIR |= L_REVERSE;          // *** OUTPUT ***
 
-                     P6SEL0 &= ~P6_5; //  GPIO operation
-                     P6SEL1 &= ~P6_5; //  GPIO operation
-                     P6OUT &= ~P6_5; // Initial Value = low
-                     P6DIR &= ~P6_5; // Direction = input
+        // P6.5 unused
+        P6SEL0 &= ~P6_5;
+        P6SEL1 &= ~P6_5;
+        P6OUT &= ~P6_5;
+        P6DIR &= ~P6_5;              // Input (unused)
 
-                     P6SEL0 &= ~GRN_LED; //  Clock operation
-                     P6SEL1 &= ~GRN_LED; //  Clock operation
-                     P6OUT &= ~GRN_LED; // Initial Value = low
-                     P6DIR |= GRN_LED; // Direction = input
-                     //------------------------------------------------------------------------------
-                    }
+        // Green LED
+        P6SEL0 &= ~GRN_LED;
+        P6SEL1 &= ~GRN_LED;
+        P6OUT &= ~GRN_LED;
+        P6DIR |= GRN_LED;            // Output
+    }
+
 
