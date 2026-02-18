@@ -44,11 +44,11 @@
 #define USE_GPIO                (0x00)
 #define USE_SMCLK               (0x01)
 #define DEBOUNCE_THRESHOLD      (500)
-#define SMCLK_DIV_16    (0x0040)    // CSCTL5 DIVS bits [6:4] = 100 = /16
 
 #define TB0CCR0_INTERVAL_8MHZ   (40000)
 #define TB0CCR0_INTERVAL_500KHZ (2500)
 #define TB0CCR0_INTERVAL        TB0CCR0_INTERVAL_500KHZ
-
+#define CS_UNLOCK    (0xA5)     // Clock system password — write to CSCTL0_H to unlock
+#define CS_LOCK      (0x00)     // Write to CSCTL0_H to lock clock registers
 
 #endif /* MACROS_H_ */
