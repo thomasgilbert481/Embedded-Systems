@@ -30,10 +30,14 @@ extern volatile unsigned int update_display_count; // Counter for display refres
 extern volatile unsigned int p5_timer;           // Movement timing counter
 extern volatile unsigned int p5_running;         // Flag: is P5 timer active?
 
+// Project 6 timing
+extern volatile unsigned int p6_timer;           // P6 state machine timer
+extern volatile unsigned int p6_running;         // Flag: is P6 timer active?
+
 // Defined HERE (were previously in Carlson's timer .obj)
 volatile unsigned int Time_Sequence = 0;
 volatile char one_time = 0;
-// Defined in LCD.obj — do NOT redefine, just extern
+// Defined in LCD.obj ï¿½ do NOT redefine, just extern
 extern volatile unsigned char update_display;
 extern volatile unsigned int update_display_count;
 
@@ -93,7 +97,7 @@ __interrupt void Timer0_B0_ISR(void){
     }
 
     //--------------------------------------------------------------------------
-    // Display update timing — refresh LCD every ~200ms (every 40 ticks at 5ms each)
+    // Display update timing ï¿½ refresh LCD every ~200ms (every 40 ticks at 5ms each)
     //--------------------------------------------------------------------------
     update_display_count++;
     if(update_display_count >= 40){     // 40 * 5ms = 200ms between LCD refreshes
@@ -102,13 +106,20 @@ __interrupt void Timer0_B0_ISR(void){
     }
 
     //--------------------------------------------------------------------------
-    // Project 5 movement timer — only counts when a movement is active
+    // Project 5 movement timer ï¿½ only counts when a movement is active
     //--------------------------------------------------------------------------
     if(p5_running){
         p5_timer++;                     // Incremented every 5ms
                                         // ONE_SEC (200) ticks = 1.0 second
                                         // TWO_SEC (400) ticks = 2.0 seconds
                                         // THREE_SEC (600) ticks = 3.0 seconds
+    }
+
+    //--------------------------------------------------------------------------
+    // Project 6 state machine timer â€” only counts when P6 sequence is active
+    //--------------------------------------------------------------------------
+    if(p6_running){
+        p6_timer++;                     // Incremented every 5ms
     }
 
     TB0CCTL0 &= ~CCIFG;                // Clear the interrupt flag
