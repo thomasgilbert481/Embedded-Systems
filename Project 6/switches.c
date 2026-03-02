@@ -21,9 +21,6 @@ extern char display_line[4][11];
 extern volatile unsigned char display_changed;
 
 // Project 5 state variables (defined in main.c)
-extern unsigned int p5_step;
-extern char p5_started;
-extern char step_init;
 extern volatile unsigned int p5_timer;
 extern volatile unsigned int p5_running;
 
@@ -99,10 +96,9 @@ void Switches_Process(void) {
             P2OUT &= ~IR_LED;
             ir_emitter_on = 0;
 
-            // Reset Project 5 state
-            p5_started = 0;
+            // Reset Project 5 timer/running flags
             p5_running = 0;
-            p5_step    = 0;
+            p5_timer   = 0;
 
             // Reset Project 6 state
             p6_state   = P6_IDLE;
