@@ -86,9 +86,10 @@ void main(void){
     // Safety: ensure all motors start off
     Wheels_All_Off();
 
-    // IR emitter starts OFF (save battery, avoid ambient IR interference)
-    P2OUT &= ~IR_LED;
-    ir_emitter_on = 0;
+    // IR emitter ON from startup -- needed so IDLE calibration screen shows
+    // meaningful L:/R: readings (phototransistors require active IR illumination)
+    P2OUT |= IR_LED;
+    ir_emitter_on = 1;
 
     // Initial display
     strcpy(display_line[0], " Project6 ");
@@ -216,8 +217,8 @@ void Run_Project6(void){
     // we rely on its readings for black line detection.
     //--------------------------------------------------------------------------
     case P6_WAIT_1SEC:
-        if(p6_timer == 0){
-            // On first entry: turn on IR emitter (warm-up during the delay)
+        if(!ir_emitter_on){
+            // Ensure IR emitter is on (guards against timer race on entry)
             P2OUT |= IR_LED;
             ir_emitter_on = 1;
         }
