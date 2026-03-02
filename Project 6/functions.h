@@ -140,4 +140,11 @@ void Spin_CW_On(void);
 void Spin_CCW_On(void);
 void Run_Project5(void);
 
+// ADC functions (Project 6)
+void Init_ADC(void);
+void HexToBCD(int hex_value);
+
+// Project 6 state machine
+void Run_Project6(void);
+
 

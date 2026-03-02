@@ -46,25 +46,28 @@ void Init_Ports(void){ //Init all ports
              P1OUT &= ~A1_SEEED; // Initial Value = Low / Off
              P1DIR &= ~A1_SEEED; // Direction = input
 
-             P1SEL0 &= ~V_DETECT_L; //  GPIO operation
-             P1SEL1 &= ~V_DETECT_L; //  GPIO operation
-             P1OUT &= ~V_DETECT_L; // Initial Value = Low / Off
-             P1DIR &= ~V_DETECT_L; // Direction = output
+             // V_DETECT_L — P1.2 as ADC input (channel A2, Left IR detector)
+             P1SEL0 |=  V_DETECT_L; // ADC function: SEL0 = 1
+             P1SEL1 |=  V_DETECT_L; // ADC function: SEL1 = 1
+             P1OUT &= ~V_DETECT_L; // Initial Value = Low
+             P1DIR &= ~V_DETECT_L; // Direction = input (ADC)
 
-             P1SEL0 &= ~V_DETECT_R; //  Operation
-             P1SEL1 &= ~V_DETECT_R; //  Operation
-             P1OUT &= ~V_DETECT_R; // Configure pullup resistor
-             P1DIR &= ~V_DETECT_R; // Direction = input
+             // V_DETECT_R — P1.3 as ADC input (channel A3, Right IR detector)
+             P1SEL0 |=  V_DETECT_R; // ADC function: SEL0 = 1
+             P1SEL1 |=  V_DETECT_R; // ADC function: SEL1 = 1
+             P1OUT &= ~V_DETECT_R; // Initial Value = Low
+             P1DIR &= ~V_DETECT_R; // Direction = input (ADC)
 
              P1SEL0 &= ~A4_SEEED; //  GPIO operation
              P1SEL1 &= ~A4_SEEED; //  GPIO operation
              P1OUT &= ~A4_SEEED; // Initial Value = Low / Off
              P1DIR &= ~A4_SEEED; // Direction = input
 
-             P1SEL0 &= ~V_THUMB; //  GPIO operation
-             P1SEL1 &= ~V_THUMB; //  GPIO operation
-             P1OUT &= ~V_THUMB; // Initial Value = low
-             P1DIR &= ~V_THUMB; // Direction = input
+             // V_THUMB — P1.5 as ADC input (channel A5, Thumbwheel potentiometer)
+             P1SEL0 |=  V_THUMB; // ADC function: SEL0 = 1
+             P1SEL1 |=  V_THUMB; // ADC function: SEL1 = 1
+             P1OUT &= ~V_THUMB; // Initial Value = Low
+             P1DIR &= ~V_THUMB; // Direction = input (ADC)
 
              P1SEL0 &= ~UCA0RXD; // LFXOUT Clock operation
              P1SEL1 &= ~UCA0RXD; // LFXOUT Clock operation
