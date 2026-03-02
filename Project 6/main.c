@@ -31,12 +31,9 @@
 #include "adc.h"
 
 //==============================================================================
-// Function Prototypes
+// Function Prototypes (local to main.c)
 //==============================================================================
 void main(void);
-void Init_Conditions(void);
-void Display_Process(void);
-void Init_LEDs(void);
 void Run_Project6(void);
 
 //==============================================================================
@@ -353,40 +350,6 @@ void Run_Project6(void){
     }
 }
 
-//==============================================================================
-// Function: Init_Conditions
-// Description: Initialize software variables and enable global interrupts.
-//==============================================================================
-void Init_Conditions(void){
-    // Initialize display state
-    display_mode  = 0;
-    slow_input_down = 0;
-
-    // Enable global interrupts (required for timer ISR and ADC ISR)
-    __enable_interrupt();
-}
-
-//==============================================================================
-// Function: Display_Process
-// Description: Called from the main loop each iteration.
-//              When the timer ISR sets update_display, and display_changed is
-//              set, this pushes the display buffer to the physical LCD.
-//==============================================================================
-void Display_Process(void){
-    if(update_display){
-        if(display_changed){
-            Display_Update(0, 0, 0, 0);
-            display_changed = 0;
-        }
-        update_display = 0;
-    }
-}
-
-//==============================================================================
-// Function: Init_LEDs
-// Description: Initialize LED output pins to a known state.
-//==============================================================================
-void Init_LEDs(void){
-    P1OUT &= ~RED_LED;   // Red LED off
-    P6OUT &= ~GRN_LED;   // Green LED off
-}
+// Display_Process() is defined in display.c
+// Init_Conditions() is defined in init.c
+// Init_LEDs()       is defined in LED.c
