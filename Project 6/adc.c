@@ -1,16 +1,16 @@
 //==============================================================================
 // File Name: adc.c
 // Description: ADC initialization, interrupt service routine, and BCD
-//              conversion for Project 6 — Black Line Detection.
+//              conversion for Project 6 -- Black Line Detection.
 //
 //              The ADC cycles through three channels every conversion:
-//                Channel A2 (P1.2, V_DETECT_L) — Left IR phototransistor
-//                Channel A3 (P1.3, V_DETECT_R) — Right IR phototransistor
-//                Channel A5 (P1.5, V_THUMB)    — Thumbwheel potentiometer
+//                Channel A2 (P1.2, V_DETECT_L) -- Left IR phototransistor
+//                Channel A3 (P1.3, V_DETECT_R) -- Right IR phototransistor
+//                Channel A5 (P1.5, V_THUMB)    -- Thumbwheel potentiometer
 //
 //              IR detector behavior (with emitter ON):
-//                White surface → high IR reflection → lower ADC reading
-//                Black surface → low  IR reflection → higher ADC reading
+//                White surface -> high IR reflection -> lower ADC reading
+//                Black surface -> low  IR reflection -> higher ADC reading
 //
 // Author: Thomas Gilbert
 // Date: Mar 2026
@@ -26,18 +26,18 @@
 //==============================================================================
 // Global ADC Result Variables
 //==============================================================================
-volatile unsigned int ADC_Left_Detect  = 0; // A2 — Left IR detector reading
-volatile unsigned int ADC_Right_Detect = 0; // A3 — Right IR detector reading
-volatile unsigned int ADC_Thumb        = 0; // A5 — Thumbwheel potentiometer reading
+volatile unsigned int ADC_Left_Detect  = 0; // A2 -- Left IR detector reading
+volatile unsigned int ADC_Right_Detect = 0; // A3 -- Right IR detector reading
+volatile unsigned int ADC_Thumb        = 0; // A5 -- Thumbwheel potentiometer reading
 
 // Channel counter: tracks which channel the NEXT ISR read belongs to
-//   0 → just completed A2 conversion (Left Detect)
-//   1 → just completed A3 conversion (Right Detect)
-//   2 → just completed A5 conversion (Thumbwheel)
+//   0 -> just completed A2 conversion (Left Detect)
+//   1 -> just completed A3 conversion (Right Detect)
+//   2 -> just completed A5 conversion (Thumbwheel)
 volatile unsigned int adc_channel = 0;
 
 //==============================================================================
-// BCD Digit Output (ASCII) — populated by HexToBCD()
+// BCD Digit Output (ASCII) -- populated by HexToBCD()
 //==============================================================================
 char thousands = '0';
 char hundreds  = '0';
@@ -57,7 +57,7 @@ unsigned int ir_emitter_on = 0;
 //
 //   ADCCTL0: ADCSHT_2 (16-clock sample), ADCMSC (multiple sample), ADCON
 //   ADCCTL1: ADCSHS_0 (ADCSC trigger), ADCSHP (sample timer)
-//   ADCCTL2: ADCRES_2 (12-bit resolution, 0x0000–0x0FFF)
+//   ADCCTL2: ADCRES_2 (12-bit resolution, 0x0000-0x0FFF)
 //   ADCMCTL0: ADCINCH_2 (start on A2), ADCSREF_0 (AVCC/AVSS reference)
 //==============================================================================
 void Init_ADC(void){
@@ -79,7 +79,7 @@ void Init_ADC(void){
 
     // --- ADCMCTL0: input channel and voltage reference ---
     ADCMCTL0 = 0;           // Reset
-    ADCMCTL0 |= ADCINCH_2; // Start with channel A2 (V_DETECT_L — Left Detector)
+    ADCMCTL0 |= ADCINCH_2; // Start with channel A2 (V_DETECT_L -- Left Detector)
     ADCMCTL0 |= ADCSREF_0; // V(R+) = AVCC, V(R-) = AVSS
 
     // --- Enable ADC conversion-complete interrupt ---
@@ -97,7 +97,7 @@ void Init_ADC(void){
 //              global variable, switches to the next channel, and starts the
 //              next conversion.
 //
-//   Cycle:  A2 → A3 → A5 → A2 → A3 → A5 → ...
+//   Cycle:  A2 -> A3 -> A5 -> A2 -> A3 -> A5 -> ...
 //              Left    Right  Thumb
 //
 // NOTE: ADCENC must be cleared before changing the channel, then re-enabled.
@@ -110,7 +110,7 @@ __interrupt void ADC_ISR(void){
         case ADCIV_NONE:
             break;
 
-        case ADCIV_ADCOVIFG:    // ADC memory overflow — conversion result lost
+        case ADCIV_ADCOVIFG:    // ADC memory overflow -- conversion result lost
             break;
 
         case ADCIV_ADCTOVIFG:   // ADC conversion time overflow
@@ -125,24 +125,24 @@ __interrupt void ADC_ISR(void){
         case ADCIV_ADCINIFG:    // Window comparator: in-range
             break;
 
-        case ADCIV_ADCIFG:      // Conversion complete — normal path
+        case ADCIV_ADCIFG:      // Conversion complete -- normal path
             // Disable conversions before changing the channel register
             ADCCTL0 &= ~ADCENC;
 
             switch(adc_channel++){
-                case ADC_CHANNEL_SEQ_LEFT:    // Just read A2 — store Left Detect
+                case ADC_CHANNEL_SEQ_LEFT:    // Just read A2 -- store Left Detect
                     ADC_Left_Detect  = ADCMEM0;
                     ADCMCTL0 &= ~ADCINCH_15;  // Clear channel selection bits [3:0]
                     ADCMCTL0 |=  ADCINCH_3;   // Next conversion: A3 (Right Detector)
                     break;
 
-                case ADC_CHANNEL_SEQ_RIGHT:   // Just read A3 — store Right Detect
+                case ADC_CHANNEL_SEQ_RIGHT:   // Just read A3 -- store Right Detect
                     ADC_Right_Detect = ADCMEM0;
                     ADCMCTL0 &= ~ADCINCH_15;  // Clear channel selection bits [3:0]
                     ADCMCTL0 |=  ADCINCH_5;   // Next conversion: A5 (Thumbwheel)
                     break;
 
-                case ADC_CHANNEL_SEQ_THUMB:   // Just read A5 — store Thumbwheel
+                case ADC_CHANNEL_SEQ_THUMB:   // Just read A5 -- store Thumbwheel
                     ADC_Thumb = ADCMEM0;
                     ADCMCTL0 &= ~ADCINCH_15;  // Clear channel selection bits [3:0]
                     ADCMCTL0 |=  ADCINCH_2;   // Next conversion: A2 (Left Detector)
@@ -166,7 +166,7 @@ __interrupt void ADC_ISR(void){
 
 //==============================================================================
 // Function: HexToBCD
-// Description: Converts a 12-bit integer value (0–4095) into four decimal
+// Description: Converts a 12-bit integer value (0-4095) into four decimal
 //              digit characters (ASCII) stored in the globals:
 //                thousands, hundreds, tens, ones
 //
@@ -180,7 +180,7 @@ __interrupt void ADC_ISR(void){
 //                display_line[0][5] = ones;
 //
 // Parameters:
-//   hex_value — 12-bit ADC reading (0 to 4095)
+//   hex_value -- 12-bit ADC reading (0 to 4095)
 //==============================================================================
 void HexToBCD(int hex_value){
 
@@ -210,7 +210,7 @@ void HexToBCD(int hex_value){
     // --- Ones digit ---
     ones = value;
 
-    // Convert raw BCD (0–9) to ASCII ('0'–'9') by OR-ing with 0x30
+    // Convert raw BCD (0-9) to ASCII ('0'-'9') by OR-ing with 0x30
     thousands |= 0x30;
     hundreds  |= 0x30;
     tens      |= 0x30;

@@ -1,8 +1,8 @@
 //==============================================================================
 // File Name: switches.c
 // Description: Switch (button) handling for Project 6
-//              SW1 — starts the black line detection sequence (P6 state machine)
-//              SW2 — emergency stop (kills motors, resets both P5 and P6 state)
+//              SW1 -- starts the black line detection sequence (P6 state machine)
+//              SW2 -- emergency stop (kills motors, resets both P5 and P6 state)
 // Author: Thomas Gilbert
 // Date: Mar 2026
 // Compiler: Code Composer Studio
@@ -52,7 +52,7 @@ static unsigned int sw2_debounce = 0;
 void Switches_Process(void) {
 
     //--------------------------------------------------------------------------
-    // SW1 — Start Project 6 black line detection sequence
+    // SW1 -- Start Project 6 black line detection sequence
     //--------------------------------------------------------------------------
     if (sw1_debounce > 0) {
         sw1_debounce--;
@@ -77,7 +77,7 @@ void Switches_Process(void) {
     }
 
     //--------------------------------------------------------------------------
-    // SW2 — Emergency stop (kills everything)
+    // SW2 -- Emergency stop (kills everything)
     //--------------------------------------------------------------------------
     if (sw2_debounce > 0) {
         sw2_debounce--;

@@ -37,7 +37,7 @@ extern volatile unsigned int p6_running;         // Flag: is P6 timer active?
 // Defined HERE (were previously in Carlson's timer .obj)
 volatile unsigned int Time_Sequence = 0;
 volatile char one_time = 0;
-// Defined in LCD.obj � do NOT redefine, just extern
+// Defined in LCD.obj --- do NOT redefine, just extern
 extern volatile unsigned char update_display;
 extern volatile unsigned int update_display_count;
 
@@ -97,7 +97,7 @@ __interrupt void Timer0_B0_ISR(void){
     }
 
     //--------------------------------------------------------------------------
-    // Display update timing � refresh LCD every ~200ms (every 40 ticks at 5ms each)
+    // Display update timing --- refresh LCD every ~200ms (every 40 ticks at 5ms each)
     //--------------------------------------------------------------------------
     update_display_count++;
     if(update_display_count >= 40){     // 40 * 5ms = 200ms between LCD refreshes
@@ -106,7 +106,7 @@ __interrupt void Timer0_B0_ISR(void){
     }
 
     //--------------------------------------------------------------------------
-    // Project 5 movement timer � only counts when a movement is active
+    // Project 5 movement timer --- only counts when a movement is active
     //--------------------------------------------------------------------------
     if(p5_running){
         p5_timer++;                     // Incremented every 5ms
@@ -116,7 +116,7 @@ __interrupt void Timer0_B0_ISR(void){
     }
 
     //--------------------------------------------------------------------------
-    // Project 6 state machine timer — only counts when P6 sequence is active
+    // Project 6 state machine timer -- only counts when P6 sequence is active
     //--------------------------------------------------------------------------
     if(p6_running){
         p6_timer++;                     // Incremented every 5ms
