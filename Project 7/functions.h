@@ -154,6 +154,3 @@ void Run_Project5(void);
 void Init_ADC(void);
 void HexToBCD(int hex_value);
 
-// Project 6 state machine
-void Run_Project6(void);
-

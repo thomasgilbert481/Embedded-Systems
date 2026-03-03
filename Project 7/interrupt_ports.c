@@ -25,7 +25,6 @@
 #include "functions.h"
 #include "macros.h"
 #include "ports.h"
-#include "adc.h"
 #include <string.h>
 
 //==============================================================================
@@ -39,25 +38,18 @@ extern volatile unsigned char display_changed;
 extern volatile unsigned int  sw1_debounce_count;
 extern volatile unsigned int  sw2_debounce_count;
 
-// From main.c (Project 6 state machine)
-extern volatile unsigned int  p6_state;
-extern volatile unsigned int  p6_timer;
-extern volatile unsigned int  p6_running;
-
 //==============================================================================
 // ISR: switch1_interrupt
 // Description:  Port 4 interrupt for Switch 1 (P4.1, active low).
 //               Disables SW1 for the debounce duration (~1 second via CCR1),
 //               turns off the LCD backlight and halts the backlight timer,
 //               and updates the display to show "Switch 1".
-//               Also starts the Project 6 state machine if it is idle.
 //
 // Interrupt Source:  Port 4 GPIO (SW1 = P4.1)
 // Trigger:           High-to-low edge on P4.1 (press with pull-up resistor)
 //
-// Globals used:    p6_state
-// Globals changed: sw1_debounce_count, p6_state, p6_timer, p6_running,
-//                  display_line, display_changed
+// Globals used:    none
+// Globals changed: sw1_debounce_count, display_line, display_changed
 // Local variables: none
 //==============================================================================
 #pragma vector = PORT4_VECTOR
@@ -76,17 +68,10 @@ __interrupt void switch1_interrupt(void){
         TB0CCTL1 |=  CCIE;                    // 6. Enable CCR1 interrupt
 
         // Turn off backlight and halt the backlight timer during debounce
-        P6OUT    &= ~LCD_BACKLITE;            // 7.  LCD backlight OFF
-        TB0CCTL0 &= ~CCIE;                    // 8.  Disable CCR0 backlight interrupt
+        P6OUT    &= ~LCD_BACKLITE;            // 7. LCD backlight OFF
+        TB0CCTL0 &= ~CCIE;                    // 8. Disable CCR0 backlight interrupt
 
-        // Start Project 6 detection sequence if idle
-        if(p6_state == P6_IDLE){
-            p6_timer   = RESET_STATE;         // Reset state machine timer
-            p6_running = TRUE;                // Enable timer in CCR0 ISR
-            p6_state   = P6_WAIT_1SEC;        // Begin 1-second pre-move delay
-        }
-
-        // Update display line 4 to identify this switch press
+        // Update display to identify this switch press
         strcpy(display_line[3], "Switch 1  ");
         display_changed = TRUE;
     }
@@ -98,15 +83,13 @@ __interrupt void switch1_interrupt(void){
 // Description:  Port 2 interrupt for Switch 2 (P2.3, active low).
 //               Disables SW2 for the debounce duration (~1 second via CCR2),
 //               turns off the LCD backlight and halts the backlight timer,
-//               performs an emergency stop (all motors off, IR emitter off),
-//               resets the Project 6 state machine, and updates the display.
+//               and updates the display to show "Switch 2".
 //
 // Interrupt Source:  Port 2 GPIO (SW2 = P2.3)
 // Trigger:           High-to-low edge on P2.3 (press with pull-up resistor)
 //
 // Globals used:    none
-// Globals changed: sw2_debounce_count, p6_state, p6_timer, p6_running,
-//                  ir_emitter_on, display_line, display_changed
+// Globals changed: sw2_debounce_count, display_line, display_changed
 // Local variables: none
 //==============================================================================
 #pragma vector = PORT2_VECTOR
@@ -125,22 +108,10 @@ __interrupt void switch2_interrupt(void){
         TB0CCTL2 |=  CCIE;                    // 6. Enable CCR2 interrupt
 
         // Turn off backlight and halt the backlight timer during debounce
-        P6OUT    &= ~LCD_BACKLITE;            // 7.  LCD backlight OFF
-        TB0CCTL0 &= ~CCIE;                    // 8.  Disable CCR0 backlight interrupt
+        P6OUT    &= ~LCD_BACKLITE;            // 7. LCD backlight OFF
+        TB0CCTL0 &= ~CCIE;                    // 8. Disable CCR0 backlight interrupt
 
-        // Emergency stop -- cut all motor outputs immediately
-        Wheels_All_Off();
-
-        // Turn off IR emitter to conserve power
-        P2OUT        &= ~IR_LED;
-        ir_emitter_on  = FALSE;
-
-        // Reset Project 6 state machine to idle
-        p6_state   = P6_IDLE;
-        p6_running = RESET_STATE;
-        p6_timer   = RESET_STATE;
-
-        // Update display line 4 to identify this switch press
+        // Update display to identify this switch press
         strcpy(display_line[3], "Switch 2  ");
         display_changed = TRUE;
     }
