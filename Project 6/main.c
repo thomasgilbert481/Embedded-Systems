@@ -243,6 +243,13 @@ void Run_Project6(void){
     // (At least one sensor crossing the line is sufficient to trigger.)
     //--------------------------------------------------------------------------
     case P6_FORWARD:
+        // Software PWM: motor ON for MOTOR_DUTY_CYCLE ticks out of MOTOR_PWM_PERIOD
+        if((p6_timer % MOTOR_PWM_PERIOD) < MOTOR_DUTY_CYCLE){
+            Forward_On();
+        } else {
+            Forward_Off();
+        }
+
         if((ADC_Left_Detect  > BLACK_LINE_THRESHOLD) ||
            (ADC_Right_Detect > BLACK_LINE_THRESHOLD)){
 

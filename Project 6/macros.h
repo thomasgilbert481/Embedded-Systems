@@ -91,6 +91,21 @@
 // Start with ~1 second and adjust until both detectors end up over the line
 #define TURN_TIME          (200)   // 200 * 5ms = 1.0 second (adjust by testing)
 
+//------------------------------------------------------------------------------
+// Forward speed software PWM -- TUNE ON YOUR HARDWARE
+//   The ISR fires every 5ms.  Each PWM "period" is MOTOR_PWM_PERIOD ticks.
+//   The motor is ON for MOTOR_DUTY_CYCLE ticks, OFF for the rest.
+//
+//   Speed % = MOTOR_DUTY_CYCLE / MOTOR_PWM_PERIOD
+//   Examples (MOTOR_PWM_PERIOD = 10):
+//     MOTOR_DUTY_CYCLE = 10  -> 100% (full speed, same as before)
+//     MOTOR_DUTY_CYCLE =  7  ->  70%
+//     MOTOR_DUTY_CYCLE =  5  ->  50%
+//     MOTOR_DUTY_CYCLE =  3  ->  30%
+//------------------------------------------------------------------------------
+#define MOTOR_PWM_PERIOD   (10)   // PWM window in ticks (10 * 5ms = 50ms cycle)
+#define MOTOR_DUTY_CYCLE   (5)    // Ticks motor is ON per window -- tune this
+
 // end of Project 6 additions //////////////////////////////////////////////////
 
 #endif /* MACROS_H_ */
