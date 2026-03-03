@@ -48,7 +48,7 @@
 
 //------------------------------------------------------------------------------
 // ADC Channel Sequence Indices (used in ADC_ISR switch to track which channel
-// was just converted — these index into the adc_channel counter, NOT the
+// was just converted -- these index into the adc_channel counter, NOT the
 // hardware channel numbers)
 //------------------------------------------------------------------------------
 #define ADC_CHANNEL_SEQ_LEFT     (0)  // adc_channel value when A2 just finished
@@ -56,26 +56,26 @@
 #define ADC_CHANNEL_SEQ_THUMB    (2)  // adc_channel value when A5 just finished
 
 //------------------------------------------------------------------------------
-// Black line detection threshold — TUNE ON YOUR HARDWARE
+// Black line detection threshold -- TUNE ON YOUR HARDWARE
 //   IR behavior (emitter ON):
-//     White surface → more reflected IR → phototransistor pulls voltage DOWN
-//                    → lower ADC reading
-//     Black surface → less reflected IR → voltage stays HIGH
-//                    → higher ADC reading
+//     White surface -> more reflected IR -> phototransistor pulls voltage DOWN
+//                    -> lower ADC reading
+//     Black surface -> less reflected IR -> voltage stays HIGH
+//                    -> higher ADC reading
 //   Set threshold midway between your white and black readings.
-//   Example: white ~0x0100, black ~0x0500 → threshold ~0x0300
+//   Example: white ~0x0100, black ~0x0500 -> threshold ~0x0300
 //------------------------------------------------------------------------------
 #define BLACK_LINE_THRESHOLD     (0x0300)  // Adjust after hardware calibration
 
 //------------------------------------------------------------------------------
-// Project 6 State Machine — Black Line Detection Sequence
+// Project 6 State Machine -- Black Line Detection Sequence
 //------------------------------------------------------------------------------
 #define P6_IDLE            (0)  // Waiting for SW1 press
 #define P6_WAIT_1SEC       (1)  // 1-second delay before moving (fingers clear)
 #define P6_FORWARD         (2)  // Driving forward, monitoring ADC for black line
-#define P6_DETECTED_STOP   (3)  // Stopped — showing "Black Line / Detected"
+#define P6_DETECTED_STOP   (3)  // Stopped -- showing "Black Line / Detected"
 #define P6_TURNING         (4)  // Turning to align detectors over the line
-#define P6_ALIGNED         (5)  // Aligned — displaying live black line ADC values
+#define P6_ALIGNED         (5)  // Aligned -- displaying live black line ADC values
 
 //------------------------------------------------------------------------------
 // Project 6 Timing Constants (5ms per ISR tick, 200 ticks = 1 second)
@@ -87,9 +87,24 @@
 // ~3 seconds allows the TA to see the display
 #define DETECT_STOP_TIME   (600)   // 600 * 5ms = 3.0 seconds
 
-// Turn duration — TUNE ON YOUR HARDWARE
+// Turn duration -- TUNE ON YOUR HARDWARE
 // Start with ~1 second and adjust until both detectors end up over the line
 #define TURN_TIME          (200)   // 200 * 5ms = 1.0 second (adjust by testing)
+
+//------------------------------------------------------------------------------
+// Forward speed software PWM -- TUNE ON YOUR HARDWARE
+//   The ISR fires every 5ms.  Each PWM "period" is MOTOR_PWM_PERIOD ticks.
+//   The motor is ON for MOTOR_DUTY_CYCLE ticks, OFF for the rest.
+//
+//   Speed % = MOTOR_DUTY_CYCLE / MOTOR_PWM_PERIOD
+//   Examples (MOTOR_PWM_PERIOD = 10):
+//     MOTOR_DUTY_CYCLE = 10  -> 100% (full speed, same as before)
+//     MOTOR_DUTY_CYCLE =  7  ->  70%
+//     MOTOR_DUTY_CYCLE =  5  ->  50%
+//     MOTOR_DUTY_CYCLE =  3  ->  30%
+//------------------------------------------------------------------------------
+#define MOTOR_PWM_PERIOD   (10)   // PWM window in ticks (10 * 5ms = 50ms cycle)
+#define MOTOR_DUTY_CYCLE   (5)    // Ticks motor is ON per window -- tune this
 
 // end of Project 6 additions //////////////////////////////////////////////////
 

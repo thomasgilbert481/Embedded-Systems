@@ -1,7 +1,7 @@
 //==============================================================================
 // File Name: adc.h
 // Description: ADC function prototypes and extern global variable declarations
-//              for Project 6 — Black Line Detection & ADC Integration.
+//              for Project 6 -- Black Line Detection & ADC Integration.
 //
 //              Provides access to:
 //                - ADC result variables (Left/Right detectors, Thumbwheel)
@@ -19,9 +19,9 @@
 //==============================================================================
 // ADC Result Globals (defined in adc.c, extern'd here for use in other modules)
 //==============================================================================
-extern volatile unsigned int ADC_Left_Detect;   // Channel A2 — Left IR detector
-extern volatile unsigned int ADC_Right_Detect;  // Channel A3 — Right IR detector
-extern volatile unsigned int ADC_Thumb;          // Channel A5 — Thumbwheel potentiometer
+extern volatile unsigned int ADC_Left_Detect;   // Channel A2 -- Left IR detector
+extern volatile unsigned int ADC_Right_Detect;  // Channel A3 -- Right IR detector
+extern volatile unsigned int ADC_Thumb;          // Channel A5 -- Thumbwheel potentiometer
 
 //==============================================================================
 // BCD Digit Output (populated by HexToBCD(), used to build LCD display strings)
@@ -43,7 +43,7 @@ extern unsigned int ir_emitter_on;
 // Initialize the 12-bit ADC (ADCCTL0/1/2, ADCMCTL0, interrupt enable)
 void Init_ADC(void);
 
-// Convert a 12-bit integer (0–4095) to four ASCII BCD digits stored in
+// Convert a 12-bit integer (0-4095) to four ASCII BCD digits stored in
 // the globals: thousands, hundreds, tens, ones
 void HexToBCD(int hex_value);
 

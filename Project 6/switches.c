@@ -1,8 +1,8 @@
 //==============================================================================
 // File Name: switches.c
 // Description: Switch (button) handling for Project 6
-//              SW1 — starts the black line detection sequence (P6 state machine)
-//              SW2 — emergency stop (kills motors, resets both P5 and P6 state)
+//              SW1 -- starts the black line detection sequence (P6 state machine)
+//              SW2 -- emergency stop (kills motors, resets both P5 and P6 state)
 // Author: Thomas Gilbert
 // Date: Mar 2026
 // Compiler: Code Composer Studio
@@ -21,9 +21,6 @@ extern char display_line[4][11];
 extern volatile unsigned char display_changed;
 
 // Project 5 state variables (defined in main.c)
-extern unsigned int p5_step;
-extern char p5_started;
-extern char step_init;
 extern volatile unsigned int p5_timer;
 extern volatile unsigned int p5_running;
 
@@ -55,7 +52,7 @@ static unsigned int sw2_debounce = 0;
 void Switches_Process(void) {
 
     //--------------------------------------------------------------------------
-    // SW1 — Start Project 6 black line detection sequence
+    // SW1 -- Start Project 6 black line detection sequence
     //--------------------------------------------------------------------------
     if (sw1_debounce > 0) {
         sw1_debounce--;
@@ -80,7 +77,7 @@ void Switches_Process(void) {
     }
 
     //--------------------------------------------------------------------------
-    // SW2 — Emergency stop (kills everything)
+    // SW2 -- Emergency stop (kills everything)
     //--------------------------------------------------------------------------
     if (sw2_debounce > 0) {
         sw2_debounce--;
@@ -99,10 +96,9 @@ void Switches_Process(void) {
             P2OUT &= ~IR_LED;
             ir_emitter_on = 0;
 
-            // Reset Project 5 state
-            p5_started = 0;
+            // Reset Project 5 timer/running flags
             p5_running = 0;
-            p5_step    = 0;
+            p5_timer   = 0;
 
             // Reset Project 6 state
             p6_state   = P6_IDLE;
