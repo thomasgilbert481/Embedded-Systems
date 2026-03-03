@@ -32,10 +32,6 @@ extern volatile char         one_time;
 // From LCD.obj (display subsystem)
 extern volatile unsigned char update_display;
 
-// From main.c (Project 6 state machine)
-extern volatile unsigned int p6_timer;
-extern volatile unsigned int p6_running;
-
 //==============================================================================
 // ISR: Timer0_B0_ISR
 // Description:  Timer B0 CCR0 interrupt -- fires every 200ms.
@@ -45,8 +41,8 @@ extern volatile unsigned int p6_running;
 // Interrupt Source:  Timer B0 CCR0
 // Trigger:           TB0R reaches TB0CCR0 value (in continuous mode)
 //
-// Globals used:    Time_Sequence, p6_running, p6_timer
-// Globals changed: Time_Sequence, one_time, update_display, p6_timer
+// Globals used:    Time_Sequence
+// Globals changed: Time_Sequence, one_time, update_display
 // Local variables: none
 //==============================================================================
 #pragma vector = TIMER0_B0_VECTOR
@@ -69,11 +65,6 @@ __interrupt void Timer0_B0_ISR(void){
     // one_time flag: fires once per TIME_SEQ_MAX window (used by legacy SM)
     if(Time_Sequence == RESET_STATE){
         one_time = TRUE;
-    }
-
-    // Project 6 state machine timer -- only counts when the sequence is active
-    if(p6_running){
-        p6_timer++;
     }
 
     // Re-arm CCR0 for the next interrupt (continuous mode requires manual re-arm)
