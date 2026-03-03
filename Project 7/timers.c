@@ -1,17 +1,20 @@
-//==============================================================================
-// File Name: timers.c
-// Description: Timer initialization and interrupt service routines for Project 5.
-//              This file REPLACES the precompiled Timersb0.obj from Carlson.
-//              Project 5 requires: "Time must be from interrupts. You cannot
-//              use any existing functions provided from me."
+//******************************************************************************
+// File Name:    timers.c
+// Description:  Timer initialization for Homework 06.
+//               Configures Timer B0 in continuous mode for:
+//                 CCR0 -- 200ms backlight blink + display update
+//                 CCR1 -- SW1 interrupt-driven debounce
+//                 CCR2 -- SW2 interrupt-driven debounce
 //
-//              Timer_B0 CCR0: fires every 5ms (8MHz SMCLK / 40000 = 200 Hz)
-//                             => 200 ticks = 1 second
+//               Clock math (SMCLK = 8 MHz, ID__8, TBIDEX__8):
+//                 Effective clock = 8,000,000 / 8 / 8 = 125,000 Hz
+//                 TB0CCR0 = 125,000 / (1 / 0.200s) = 25,000 counts = 200ms
 //
-// Author: Thomas Gilbert
-// Date: Feb 2026
-// Compiler: Code Composer Studio
-//==============================================================================
+// Author:       Thomas Gilbert
+// Date:         Mar 2026
+// Compiler:     Code Composer Studio
+// Target:       MSP430FR2355
+//******************************************************************************
 
 #include "msp430.h"
 #include "functions.h"
@@ -19,108 +22,79 @@
 #include "ports.h"
 
 //==============================================================================
-// External variables used by the ISR
+// Global definitions (previously provided by Carlson's timerB0.obj)
 //==============================================================================
-extern volatile unsigned int Time_Sequence;      // Master timer (for display, Carlson SM)
-extern volatile char one_time;                   // One-time execution flag
-extern volatile unsigned char update_display;    // Flag to refresh LCD
-extern volatile unsigned int update_display_count; // Counter for display refresh rate
-
-// Project 5 timing
-extern volatile unsigned int p5_timer;           // Movement timing counter
-extern volatile unsigned int p5_running;         // Flag: is P5 timer active?
-
-// Project 6 timing
-extern volatile unsigned int p6_timer;           // P6 state machine timer
-extern volatile unsigned int p6_running;         // Flag: is P6 timer active?
-
-// Defined HERE (were previously in Carlson's timer .obj)
-volatile unsigned int Time_Sequence = 0;
-volatile char one_time = 0;
-// Defined in LCD.obj --- do NOT redefine, just extern
-extern volatile unsigned char update_display;
-extern volatile unsigned int update_display_count;
+volatile unsigned int Time_Sequence = RESET_STATE;
+volatile char         one_time      = FALSE;
 
 //==============================================================================
 // Function: Init_Timers
-// Description: Calls all individual timer init functions.
+// Description: Calls individual timer initialization functions.
+//              Add Init_Timer_B1/B2/B3 calls here if they are needed later.
 //==============================================================================
 void Init_Timers(void){
+//------------------------------------------------------------------------------
+// Globals used:    none
+// Globals changed: none
+//------------------------------------------------------------------------------
     Init_Timer_B0();
-    // Init_Timer_B1();  // Add these if you need them later
-    // Init_Timer_B2();
-    // Init_Timer_B3();
 }
 
 //==============================================================================
 // Function: Init_Timer_B0
-// Description: Configures Timer_B0 CCR0 to generate an interrupt every 5ms.
+// Description: Configures Timer B0 in continuous mode with three capture/
+//              compare registers:
+//                CCR0 -- 200ms period for backlight toggle and display trigger
+//                CCR1 -- SW1 software debounce (started on button press)
+//                CCR2 -- SW2 software debounce (started on button press)
 //
-//              SMCLK = 8 MHz
-//              TB0CCR0 = 40000
-//              Interrupt period = 40000 / 8,000,000 = 0.005 sec = 5ms
-//              That means 200 interrupts per second => ONE_SEC = 200
+//              Timer source:  SMCLK = 8 MHz
+//              ID divider:    /8  (ID__8)
+//              TBIDEX divider: /8 (TBIDEX__8)
+//              Effective clock: 8,000,000 / 8 / 8 = 125,000 Hz
+//              CCR0 count:    125,000 / 5 = 25,000  =>  200ms interval
 //
-//              Timer mode: Up mode (counts from 0 to TB0CCR0, then resets)
+//              CRITICAL: TBCLR must be written AFTER ID and TBIDEX are set
+//              so that all internal divider flip-flops are reset correctly.
+//
+// Globals used:    none
+// Globals changed: none
+// Local variables: none
 //==============================================================================
 void Init_Timer_B0(void){
-    TB0CTL  = TBSSEL__SMCLK;    // Clock source = SMCLK (8 MHz)
-    TB0CTL |= MC__UP;           // Up mode: count to TB0CCR0
-    TB0CTL |= TBCLR;            // Clear the timer counter
+//------------------------------------------------------------------------------
 
-    TB0CCR0 = TB0CCR0_INTERVAL; // Set the compare value (defined in macros.h)
-
-    TB0CCTL0 |= CCIE;          // Enable CCR0 interrupt
-}
-
-//==============================================================================
-// ISR: Timer0_B0_ISR
-// Description: Fires every 5ms (200 times per second).
-//              Handles:
-//              - Time_Sequence: master counter for display timing and Carlson SM
-//              - update_display: flags LCD refresh every ~200ms
-//              - p5_timer: Project 5 movement timing (only when p5_running == 1)
-//              - one_time: reset each time Time_Sequence changes by 50
-//==============================================================================
-#pragma vector = TIMER0_B0_VECTOR
-__interrupt void Timer0_B0_ISR(void){
+    TB0CTL  = TBSSEL__SMCLK;      // Clock source = SMCLK (8 MHz)
+    TB0CTL |= MC__CONTINUOUS;     // Continuous mode: counts 0 -> 0xFFFF, repeats
+    TB0CTL |= ID__8;              // Input divider: divide clock by 8
+    TB0EX0  = TBIDEX__8;          // Additional divider: divide by 8
+    TB0CTL |= TBCLR;              // Clear TB0R, clock divider, count direction
+    // NOTE: TBCLR must come AFTER ID and TBIDEX to reset all divider flip-flops
 
     //--------------------------------------------------------------------------
-    // Master time counter (keeps existing behavior from Carlson's code)
+    // CCR0 -- Backlight blink + display update (200ms interval)
     //--------------------------------------------------------------------------
-    Time_Sequence++;
-
-    // one_time flag: allows the Carlson state machine to run once per 50-tick window
-    // (kept for compatibility, not critical for Project 5)
-    if (Time_Sequence % 50 == 0){
-        one_time = 1;
-    }
+    TB0CCR0  = TB0CCR0_INTERVAL;  // First interrupt at 25,000 counts (200ms)
+    TB0CCTL0 &= ~CCIFG;           // Clear any pending CCR0 interrupt flag
+    TB0CCTL0 |=  CCIE;            // Enable CCR0 interrupt
 
     //--------------------------------------------------------------------------
-    // Display update timing --- refresh LCD every ~200ms (every 40 ticks at 5ms each)
+    // CCR1 -- SW1 debounce timer (disabled until SW1 is pressed)
     //--------------------------------------------------------------------------
-    update_display_count++;
-    if(update_display_count >= 40){     // 40 * 5ms = 200ms between LCD refreshes
-        update_display_count = 0;
-        update_display = 1;             // Tell Display_Process() to refresh
-    }
+    TB0CCR1  = TB0CCR1_INTERVAL;  // Load initial value (re-armed on SW1 press)
+    TB0CCTL1 &= ~CCIFG;           // Clear any pending CCR1 interrupt flag
+    TB0CCTL1 &= ~CCIE;            // Disable CCR1 interrupt (enabled in SW1 ISR)
 
     //--------------------------------------------------------------------------
-    // Project 5 movement timer --- only counts when a movement is active
+    // CCR2 -- SW2 debounce timer (disabled until SW2 is pressed)
     //--------------------------------------------------------------------------
-    if(p5_running){
-        p5_timer++;                     // Incremented every 5ms
-                                        // ONE_SEC (200) ticks = 1.0 second
-                                        // TWO_SEC (400) ticks = 2.0 seconds
-                                        // THREE_SEC (600) ticks = 3.0 seconds
-    }
+    TB0CCR2  = TB0CCR2_INTERVAL;  // Load initial value (re-armed on SW2 press)
+    TB0CCTL2 &= ~CCIFG;           // Clear any pending CCR2 interrupt flag
+    TB0CCTL2 &= ~CCIE;            // Disable CCR2 interrupt (enabled in SW2 ISR)
 
     //--------------------------------------------------------------------------
-    // Project 6 state machine timer -- only counts when P6 sequence is active
+    // Overflow -- not used
     //--------------------------------------------------------------------------
-    if(p6_running){
-        p6_timer++;                     // Incremented every 5ms
-    }
-
-    TB0CCTL0 &= ~CCIFG;                // Clear the interrupt flag
+    TB0CTL &= ~TBIE;              // Disable overflow interrupt
+    TB0CTL &= ~TBIFG;             // Clear overflow interrupt flag
 }

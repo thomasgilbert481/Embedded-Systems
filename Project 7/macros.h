@@ -18,10 +18,22 @@
 
 // Project 5 additions /////////////////////////////////////////////////////////
 
-// Timer B0 CCR0 interval
-// SMCLK = 8 MHz, so 40000 counts = 5ms per interrupt
-// 200 interrupts = 1 second
-#define TB0CCR0_INTERVAL     (40000)
+// Timer B0 CCR0 interval -- HW06: continuous mode, ID__8, TBIDEX__8 = 125kHz
+// 8,000,000 / 8 / 8 / (1 / 0.200) = 25,000 counts = 200ms per interrupt
+// 5 interrupts = 1 second
+#define TB0CCR0_INTERVAL     (25000)  // 200ms: 8MHz/8/8/(1/0.2) = 25,000
+
+// Timer B0 CCR1/CCR2 intervals for interrupt-driven switch debounce
+// Same divider chain as CCR0 => same 200ms per interrupt
+#define TB0CCR1_INTERVAL     (25000)  // 200ms base for SW1 debounce
+#define TB0CCR2_INTERVAL     (25000)  // 200ms base for SW2 debounce
+
+// Debounce threshold: number of CCR1/CCR2 interrupts before re-enabling switch
+// 5 x 200ms = 1.0 second total debounce period
+#define DEBOUNCE_THRESHOLD   (5)      // 5 x 200ms = 1 second
+
+// Time_Sequence wrap value (250 x 200ms = 50 seconds)
+#define TIME_SEQ_MAX         (250)
 
 // Movement sequence step numbers
 #define P5_FWD1              (1)
@@ -36,11 +48,10 @@
 #define P5_PAUSE5            (10)
 #define P5_DONE              (11)
 
-// Timing constants (based on 5ms per ISR tick)
-// Adjust these if your timing is off during testing!
-#define ONE_SEC              (200)   // 200 * 5ms = 1.0 second
-#define TWO_SEC              (400)   // 400 * 5ms = 2.0 seconds
-#define THREE_SEC            (600)   // 600 * 5ms = 3.0 seconds
+// Timing constants (based on 200ms per ISR tick -- HW06 CCR0 interval)
+#define ONE_SEC              (5)     // 5 x 200ms = 1.0 second
+#define TWO_SEC              (10)    // 10 x 200ms = 2.0 seconds
+#define THREE_SEC            (15)    // 15 x 200ms = 3.0 seconds
 
 // end of Project 5 additions //////////////////////////////////////////////////
 
@@ -81,30 +92,25 @@
 // Project 6 Timing Constants (5ms per ISR tick, 200 ticks = 1 second)
 //------------------------------------------------------------------------------
 // 1-second delay after SW1 before moving forward
-#define DETECT_DELAY_1SEC  (200)   // 200 * 5ms = 1.0 second
+#define DETECT_DELAY_1SEC  (5)     // 5 x 200ms = 1.0 second
 
 // Duration to display "Black Line / Detected" message before turning
 // ~3 seconds allows the TA to see the display
-#define DETECT_STOP_TIME   (600)   // 600 * 5ms = 3.0 seconds
+#define DETECT_STOP_TIME   (15)    // 15 x 200ms = 3.0 seconds
 
 // Turn duration -- TUNE ON YOUR HARDWARE
-// Start with ~1 second and adjust until both detectors end up over the line
-#define TURN_TIME          (50)   // 50 * 5ms = 0.25 second (adjust by testing)
+// Start with ~2 ticks and adjust until both detectors end up over the line
+#define TURN_TIME          (2)     // 2 x 200ms = 0.4 second (adjust by testing)
 
 //------------------------------------------------------------------------------
 // Forward speed software PWM -- TUNE ON YOUR HARDWARE
 //   The ISR fires every 5ms.  Each PWM "period" is MOTOR_PWM_PERIOD ticks.
 //   The motor is ON for MOTOR_DUTY_CYCLE ticks, OFF for the rest.
 //
-//   Speed % = MOTOR_DUTY_CYCLE / MOTOR_PWM_PERIOD
-//   Examples (MOTOR_PWM_PERIOD = 10):
-//     MOTOR_DUTY_CYCLE = 10  -> 100% (full speed, same as before)
-//     MOTOR_DUTY_CYCLE =  7  ->  70%
-//     MOTOR_DUTY_CYCLE =  5  ->  50%
-//     MOTOR_DUTY_CYCLE =  3  ->  30%
+//   HW06 note: software PWM removed from FORWARD state -- timer now fires at
+//   200ms intervals, which is too coarse for motor duty cycle control.
+//   Motors run at full speed in the FORWARD state.
 //------------------------------------------------------------------------------
-#define MOTOR_PWM_PERIOD   (10)   // PWM window in ticks (10 * 5ms = 50ms cycle)
-#define MOTOR_DUTY_CYCLE   (3)    // Ticks motor is ON per window -- tune this
 
 // end of Project 6 additions //////////////////////////////////////////////////
 

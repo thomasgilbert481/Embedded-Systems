@@ -1,26 +1,24 @@
-//==============================================================================
-// File Name: main.c
-// Description: Main routine for Project 6 -- ADC Black Line Detection.
+//******************************************************************************
+// File Name:    main.c
+// Description:  Main routine for Homework 06 -- Timer B0 and Switch Interrupts.
 //
-//              New features over Project 5:
-//                1. Thumbwheel ADC reading displayed on LCD (validates ADC).
-//                2. IR emitter + left/right phototransistor detectors used to
-//                   detect a black line on a white surface.
+//               Built on Project 6 (ADC Black Line Detection).
+//               New features in HW06:
+//                 1. Timer B0 in continuous mode -- CCR0 fires every 200ms,
+//                    toggling the LCD backlight at 2.5 Hz and triggering
+//                    display updates.
+//                 2. Interrupt-driven switch debouncing via CCR1 (SW1) and
+//                    CCR2 (SW2) -- replaces software polling in Switches_Process.
+//                 3. timerB0.obj removed; Init_Timer_B0 written in timers.c.
 //
-//              Demo sequence:
-//                - Press SW1 -> 1-second delay -> car drives forward
-//                - When EITHER detector reads above BLACK_LINE_THRESHOLD, stop
-//                - Display "Black Line / Detected" for ~3 seconds
-//                - Turn until both detectors are over the line
-//                - Display live black line ADC values
+//               Timer tick basis: 200ms (CCR0 interval)
+//                 ONE_SEC = 5 ticks, THREE_SEC = 15 ticks
 //
-//              Timer: Timer_B0 fires every 5ms (200 Hz)
-//                     ONE_SEC = 200 ticks
-//
-// Author: Thomas Gilbert
-// Date: Mar 2026
-// Compiler: Code Composer Studio
-//==============================================================================
+// Author:       Thomas Gilbert
+// Date:         Mar 2026
+// Compiler:     Code Composer Studio
+// Target:       MSP430FR2355
+//******************************************************************************
 
 #include "msp430.h"
 #include <string.h>
@@ -45,25 +43,24 @@ extern char *display[4];                        // Pointers to each display line
 unsigned char display_mode;                     // Display mode selector
 extern volatile unsigned char display_changed;  // Flag: LCD content updated
 extern volatile unsigned char update_display;   // Flag: timer says refresh LCD
-extern volatile unsigned int update_display_count; // Counter for display timing
 extern volatile unsigned int Time_Sequence;     // Master timer counter from ISR
 extern volatile char one_time;                  // One-time execution flag
 
-// Project 5 timing (kept for compatibility -- not used in P6 sequence)
-volatile unsigned int p5_timer   = 0;
-volatile unsigned int p5_running = 0;
-unsigned int p5_step    = 0;
-char p5_started = 0;
-char step_init  = 1;
+// Project 5 timing (kept for compatibility -- not used in P6/HW06 sequence)
+volatile unsigned int p5_timer   = RESET_STATE;
+volatile unsigned int p5_running = FALSE;
+unsigned int p5_step    = RESET_STATE;
+char p5_started = FALSE;
+char step_init  = TRUE;
 
 // Project 6 state machine
 volatile unsigned int p6_state   = P6_IDLE;    // Current state
-volatile unsigned int p6_timer   = 0;           // State timer (incremented in ISR)
-volatile unsigned int p6_running = 0;           // 1 = ISR increments p6_timer
+volatile unsigned int p6_timer   = RESET_STATE; // State timer (incremented in CCR0 ISR)
+volatile unsigned int p6_running = FALSE;       // TRUE = ISR increments p6_timer
 
 // Which side first detected the line -- used to choose turn direction
 // 0 = left triggered first, 1 = right triggered first
-static unsigned int first_detect_side = 0;
+static unsigned int first_detect_side = RESET_STATE;
 
 unsigned int test_value;
 char chosen_direction;
@@ -71,29 +68,40 @@ char change;
 
 //==============================================================================
 // Function: main
+// Description: System entry point. Initializes all peripherals, then loops
+//              forever handling display updates, the P6 state machine, and
+//              oscilloscope heartbeat.
+//
+//              Switch handling is entirely interrupt-driven (interrupt_ports.c).
+//              Display is updated at most every 200ms, gated by update_display
+//              (set by Timer0_B0_ISR in interrupts_timers.c).
+//
+// Globals used:    update_display, p6_state, display_changed
+// Globals changed: display_line, display_changed, ir_emitter_on
+// Local variables: none
 //==============================================================================
 void main(void){
+//------------------------------------------------------------------------------
 
     PM5CTL0 &= ~LOCKLPM5;  // Unlock GPIO (required after reset on FR devices)
 
     Init_Ports();           // Configure all GPIO pins (ADC pins set in ports.c)
     Init_Clocks();          // Configure clock system (8 MHz MCLK/SMCLK)
-    Init_Conditions();      // Initialize variables, enable interrupts
-    Init_Timers();          // Set up Timer B0 (5ms tick, 200 Hz)
+    Init_Conditions();      // Initialize variables, enable global interrupts
+    Init_Timers();          // Set up Timer B0 (200ms CCR0, CCR1/CCR2 for debounce)
     Init_LCD();             // Initialize LCD display (SPI)
     Init_ADC();             // Initialize 12-bit ADC, start cycling A2->A3->A5
 
     // Safety: ensure all motors start off
     Wheels_All_Off();
 
-    // IR emitter ON from startup -- needed so IDLE calibration screen shows
-    // meaningful L:/R: readings (phototransistors require active IR illumination)
+    // IR emitter ON from startup so idle screen shows meaningful L:/R: readings
     P2OUT |= IR_LED;
-    ir_emitter_on = 1;
+    ir_emitter_on = TRUE;
 
     // Initial display
-    strcpy(display_line[0], " Project6 ");
-    strcpy(display_line[1], "ADC+IRLine");
+    strcpy(display_line[0], " HW06     ");
+    strcpy(display_line[1], "TimerB0+SW");
     strcpy(display_line[2], " Press SW1");
     strcpy(display_line[3], " to Start ");
     display_changed = TRUE;
@@ -103,16 +111,12 @@ void main(void){
     //==========================================================================
     while(ALWAYS){
 
-        Display_Process();    // Refresh LCD when flagged by timer ISR
-
-        Switches_Process();   // Poll SW1 (start P6) and SW2 (emergency stop)
-
-        Run_Project6();       // Execute the black line detection state machine
-
-        // Update ADC display during IDLE and ALIGNED states so the operator
-        // can verify detector readings before and after the run
+        //----------------------------------------------------------------------
+        // ADC display update: when the 200ms timer fires AND we are in a state
+        // that shows live ADC readings, build the display buffer and mark it
+        // dirty.  Do NOT clear update_display here -- Display_Process does it.
+        //----------------------------------------------------------------------
         if(update_display && (p6_state == P6_IDLE || p6_state == P6_ALIGNED)){
-            update_display = 0;
 
             // Line 0: Left detector  -- format "L:XXXX    "
             HexToBCD((int)ADC_Left_Detect);
@@ -176,57 +180,69 @@ void main(void){
             display_line[3][10] = '\0';
 
             display_changed = TRUE;
+            // update_display is intentionally NOT cleared here;
+            // Display_Process() clears it and calls Display_Update()
         }
+
+        //----------------------------------------------------------------------
+        // Display_Process: clears update_display, writes LCD if display_changed.
+        // Called AFTER ADC update so display_changed is already set when needed.
+        //----------------------------------------------------------------------
+        Display_Process();
+
+        //----------------------------------------------------------------------
+        // Project 6 black line detection state machine
+        //----------------------------------------------------------------------
+        Run_Project6();
 
         P3OUT ^= TEST_PROBE;  // Toggle test probe (oscilloscope heartbeat)
     }
+//------------------------------------------------------------------------------
 }
 
 //==============================================================================
 // Function: Run_Project6
 // Description: State machine for the black line detection sequence.
 //
-//   P6_IDLE          -- Display ADC values; wait for SW1 (handled in switches.c)
-//   P6_WAIT_1SEC     -- 1-second delay before driving forward
+//   P6_IDLE          -- Display ADC values; wait for SW1 (now handled in ISR)
+//   P6_WAIT_1SEC     -- 1-second delay before driving forward (5 x 200ms ticks)
 //   P6_FORWARD       -- Drive forward; monitor ADC for black line
 //   P6_DETECTED_STOP -- Stopped; show "Black Line / Detected" for ~3 seconds
 //   P6_TURNING       -- Turn to align detectors over the line
 //   P6_ALIGNED       -- Final state; display live black line ADC values
 //
-//   IR emitter is turned ON when leaving P6_WAIT_1SEC and stays ON during
-//   forward motion and turning.  It is turned OFF on SW2 (emergency stop).
-//
-//   p6_timer is incremented by Timer0_B0_ISR every 5ms when p6_running == 1.
+//   p6_timer is incremented by Timer0_B0_ISR every 200ms when p6_running == 1.
 //   Reset p6_timer = 0 whenever entering a new state.
+//
+// Globals used:    p6_state, p6_timer, p6_running, ADC_Left_Detect,
+//                  ADC_Right_Detect, first_detect_side
+// Globals changed: p6_state, p6_timer, p6_running, display_line, display_changed
+// Local variables: none
 //==============================================================================
 void Run_Project6(void){
+//------------------------------------------------------------------------------
 
     switch(p6_state){
 
     //--------------------------------------------------------------------------
-    // IDLE: do nothing -- SW1 handler sets state to P6_WAIT_1SEC
+    // IDLE: do nothing -- SW1 ISR (interrupt_ports.c) starts the sequence.
     //--------------------------------------------------------------------------
     case P6_IDLE:
-        // ADC display is handled in the main loop when update_display is set.
-        // No motor action here.
         break;
 
     //--------------------------------------------------------------------------
-    // WAIT_1SEC: 1-second countdown before moving forward
-    // IR emitter is turned on here so it has ~1 second of warm-up time before
-    // we rely on its readings for black line detection.
+    // WAIT_1SEC: 1-second countdown (5 x 200ms ticks) before moving forward.
+    // IR emitter is already on from main startup (or re-enabled separately).
     //--------------------------------------------------------------------------
     case P6_WAIT_1SEC:
         if(!ir_emitter_on){
-            // Ensure IR emitter is on (guards against timer race on entry)
             P2OUT |= IR_LED;
-            ir_emitter_on = 1;
+            ir_emitter_on = TRUE;
         }
         if(p6_timer >= DETECT_DELAY_1SEC){
-            p6_timer = 0;
+            p6_timer = RESET_STATE;
             p6_state = P6_FORWARD;
 
-            // Begin moving forward
             Forward_On();
 
             strcpy(display_line[0], " Forward  ");
@@ -238,32 +254,26 @@ void Run_Project6(void){
         break;
 
     //--------------------------------------------------------------------------
-    // FORWARD: drive forward and monitor detectors for the black line.
-    // Detection condition: EITHER detector reads above BLACK_LINE_THRESHOLD.
-    // (At least one sensor crossing the line is sufficient to trigger.)
+    // FORWARD: drive forward at full speed; monitor ADC for black line.
+    // Detection: EITHER detector reads above BLACK_LINE_THRESHOLD.
+    // Note: software PWM removed -- timer granularity is 200ms (too coarse).
     //--------------------------------------------------------------------------
     case P6_FORWARD:
-        // Software PWM: motor ON for MOTOR_DUTY_CYCLE ticks out of MOTOR_PWM_PERIOD
-        if((p6_timer % MOTOR_PWM_PERIOD) < MOTOR_DUTY_CYCLE){
-            Forward_On();
-        } else {
-            Forward_Off();
-        }
+        Forward_On();   // Full speed forward
 
         if((ADC_Left_Detect  > BLACK_LINE_THRESHOLD) ||
            (ADC_Right_Detect > BLACK_LINE_THRESHOLD)){
 
-            // STOP immediately -- H-bridge safety: all-off before any state change
-            Wheels_All_Off();
+            Wheels_All_Off();   // Stop immediately
 
-            // Record which side triggered first (for turn direction decision)
+            // Record which side triggered first (determines turn direction)
             if(ADC_Left_Detect > ADC_Right_Detect){
-                first_detect_side = 0;  // Left side detected stronger signal
+                first_detect_side = RESET_STATE;  // Left detected stronger
             } else {
-                first_detect_side = 1;  // Right side detected stronger signal
+                first_detect_side = TRUE;          // Right detected stronger
             }
 
-            p6_timer = 0;
+            p6_timer = RESET_STATE;
             p6_state = P6_DETECTED_STOP;
 
             strcpy(display_line[0], "Black Line");
@@ -276,21 +286,17 @@ void Run_Project6(void){
 
     //--------------------------------------------------------------------------
     // DETECTED_STOP: display "Black Line / Detected" for DETECT_STOP_TIME ticks
-    // (~3 seconds) so the TA can confirm, then transition to turning.
+    // (~3 seconds at 200ms per tick) so the TA can confirm, then turn.
     //--------------------------------------------------------------------------
     case P6_DETECTED_STOP:
         if(p6_timer >= DETECT_STOP_TIME){
-            p6_timer = 0;
+            p6_timer = RESET_STATE;
             p6_state = P6_TURNING;
 
-            // Turn based on which detector saw the line most strongly.
-            // Goal: rotate so BOTH detectors end up over the line.
-            // If left triggered first, spin right (rotate car left);
-            // if right triggered first, spin left (rotate car right).
-            if(first_detect_side == 0){
-                Spin_CW_On();   // Spin right to bring left side over line
+            if(first_detect_side == RESET_STATE){
+                Spin_CW_On();    // Left detected first -> spin right
             } else {
-                Spin_CCW_On();  // Spin left to bring right side over line
+                Spin_CCW_On();   // Right detected first -> spin left
             }
 
             strcpy(display_line[0], " Turning  ");
@@ -302,16 +308,14 @@ void Run_Project6(void){
         break;
 
     //--------------------------------------------------------------------------
-    // TURNING: spin until p6_timer reaches TURN_TIME, then stop and declare
-    // aligned.  TUNE TURN_TIME in macros.h based on your hardware.
+    // TURNING: spin for TURN_TIME ticks (~0.4 seconds), then stop.
     //--------------------------------------------------------------------------
     case P6_TURNING:
         if(p6_timer >= TURN_TIME){
             Wheels_All_Off();
-            p6_running = 0;     // Stop the ISR counter -- sequence is complete
+            p6_running = FALSE;     // Stop the ISR counter
             p6_state   = P6_ALIGNED;
 
-            // Build "aligned" display showing final detector readings
             HexToBCD((int)ADC_Left_Detect);
             display_line[2][0] = 'L';
             display_line[2][1] = ':';
@@ -345,19 +349,14 @@ void Run_Project6(void){
         break;
 
     //--------------------------------------------------------------------------
-    // ALIGNED: final state -- the main loop's update_display handler shows
-    // live ADC readings continuously.  No motor action.
+    // ALIGNED: final state -- main loop ADC block shows live detector readings.
     //--------------------------------------------------------------------------
     case P6_ALIGNED:
-        // Live ADC updates handled in the main loop (update_display block).
         break;
 
     default:
         Wheels_All_Off();   // Safety: unknown state -- stop motors
         break;
     }
+//------------------------------------------------------------------------------
 }
-
-// Display_Process() is defined in display.c
-// Init_Conditions() is defined in init.c
-// Init_LEDs()       is defined in LED.c

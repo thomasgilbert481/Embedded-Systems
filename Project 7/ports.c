@@ -46,13 +46,13 @@ void Init_Ports(void){ //Init all ports
              P1OUT &= ~A1_SEEED; // Initial Value = Low / Off
              P1DIR &= ~A1_SEEED; // Direction = input
 
-             // V_DETECT_L — P1.2 as ADC input (channel A2, Left IR detector)
+             // V_DETECT_L ï¿½ P1.2 as ADC input (channel A2, Left IR detector)
              P1SEL0 |=  V_DETECT_L; // ADC function: SEL0 = 1
              P1SEL1 |=  V_DETECT_L; // ADC function: SEL1 = 1
              P1OUT &= ~V_DETECT_L; // Initial Value = Low
              P1DIR &= ~V_DETECT_L; // Direction = input (ADC)
 
-             // V_DETECT_R — P1.3 as ADC input (channel A3, Right IR detector)
+             // V_DETECT_R ï¿½ P1.3 as ADC input (channel A3, Right IR detector)
              P1SEL0 |=  V_DETECT_R; // ADC function: SEL0 = 1
              P1SEL1 |=  V_DETECT_R; // ADC function: SEL1 = 1
              P1OUT &= ~V_DETECT_R; // Initial Value = Low
@@ -63,7 +63,7 @@ void Init_Ports(void){ //Init all ports
              P1OUT &= ~A4_SEEED; // Initial Value = Low / Off
              P1DIR &= ~A4_SEEED; // Direction = input
 
-             // V_THUMB — P1.5 as ADC input (channel A5, Thumbwheel potentiometer)
+             // V_THUMB ï¿½ P1.5 as ADC input (channel A5, Thumbwheel potentiometer)
              P1SEL0 |=  V_THUMB; // ADC function: SEL0 = 1
              P1SEL1 |=  V_THUMB; // ADC function: SEL1 = 1
              P1OUT &= ~V_THUMB; // Initial Value = Low
@@ -122,6 +122,11 @@ void Init_Ports(void){ //Init all ports
 
          P2SEL0 &= ~LFXIN; // LFXIN Clock operation
          P2SEL1 |= LFXIN; // LFXIN Clock operation
+
+         // SW2 interrupt configuration (HW06: interrupt-driven debounce)
+         P2IES |=  SW2;    // High-to-low edge trigger (button press with pull-up)
+         P2IFG &= ~SW2;    // Clear any pending SW2 interrupt flag
+         P2IE  |=  SW2;    // Enable SW2 port interrupt
          //------------------------------------------------------------------------------
         }
 
@@ -210,6 +215,11 @@ void Init_Ports(void){ //Init all ports
 
      P4SEL0 |= UCB1SOMI; // UCB1SOMI SPI BUS operation
      P4SEL1 &= ~UCB1SOMI; // UCB1SOMI SPI BUS operation
+
+     // SW1 interrupt configuration (HW06: interrupt-driven debounce)
+     P4IES |=  SW1;    // High-to-low edge trigger (button press with pull-up)
+     P4IFG &= ~SW1;    // Clear any pending SW1 interrupt flag
+     P4IE  |=  SW1;    // Enable SW1 port interrupt
      //------------------------------------------------------------------------------
     }
 
