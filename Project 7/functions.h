@@ -16,8 +16,18 @@ void Init_Conditions(void);
 
 // Interrupts
 void enable_interrupts(void);
-__interrupt void Timer0_B0_ISR(void);
-__interrupt void switch_interrupt(void);
+
+// Timer B0 ISRs (interrupts_timers.c)
+__interrupt void Timer0_B0_ISR(void);   // CCR0: 200ms backlight + display update
+__interrupt void TIMER0_B1_ISR(void);   // CCR1/CCR2: SW1/SW2 debounce timers
+
+// Port ISRs (interrupt_ports.c)
+__interrupt void switch1_interrupt(void); // PORT4_VECTOR: SW1 press (P4.1)
+__interrupt void switch2_interrupt(void); // PORT2_VECTOR: SW2 press (P2.3)
+
+// Debounce counters (defined in interrupts_timers.c)
+extern volatile unsigned int sw1_debounce_count;
+extern volatile unsigned int sw2_debounce_count;
 
 // Analog to Digital Converter
 
