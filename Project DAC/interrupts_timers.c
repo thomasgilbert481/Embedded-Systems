@@ -38,10 +38,6 @@ extern volatile char         one_time;
 // From LCD.obj (display subsystem)
 extern volatile unsigned char update_display;
 
-// From main.c (Project 6 state machine -- kept for reference, not used in DAC demo)
-extern volatile unsigned int p6_timer;
-extern volatile unsigned int p6_running;
-
 // From main.c and dac.c (Project DAC state machine)
 extern volatile unsigned int dac_state;   // Current DAC demo state
 extern volatile unsigned int dac_timer;   // Tick counter within current state
@@ -57,8 +53,8 @@ extern volatile unsigned int DAC_data;    // Current 12-bit DAC code
 // Interrupt Source:  Timer B0 CCR0
 // Trigger:           TB0R reaches TB0CCR0 value (in continuous mode)
 //
-// Globals used:    Time_Sequence, p6_running, p6_timer, dac_running, dac_state, DAC_data
-// Globals changed: Time_Sequence, one_time, update_display, p6_timer,
+// Globals used:    Time_Sequence, dac_running, dac_state, DAC_data
+// Globals changed: Time_Sequence, one_time, update_display,
 //                  dac_timer, DAC_data (SAC3DAT updated when in DAC_DRIVE)
 // Local variables: none
 //==============================================================================
@@ -82,11 +78,6 @@ __interrupt void Timer0_B0_ISR(void){
     // one_time flag: fires once per TIME_SEQ_MAX window (used by legacy SM)
     if(Time_Sequence == RESET_STATE){
         one_time = TRUE;
-    }
-
-    // Project 6 state machine timer -- only counts when the sequence is active
-    if(p6_running){
-        p6_timer++;
     }
 
     // DAC demo timer + DAC output step (Project DAC)
