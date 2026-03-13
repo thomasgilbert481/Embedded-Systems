@@ -136,7 +136,6 @@
 //   NEVER set a forward AND reverse CCR to nonzero simultaneously.
 //------------------------------------------------------------------------------
 #define WHEEL_PERIOD_VAL     (50005) // Timer B3 PWM period (~160 Hz at 8 MHz)
-#define WHEEL_OFF            (0)     // 0% duty -- motor stopped
 #define FOLLOW_FAST          (35000) // ~70% duty -- straight-ahead burst speed
 #define FOLLOW_SPEED         (25000) // ~50% duty -- normal following speed
 #define FOLLOW_SLOW          (20000) // ~40% duty -- inner-wheel correction (TUNED: was 12000)
