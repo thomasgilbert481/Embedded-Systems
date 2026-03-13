@@ -426,6 +426,10 @@ void Run_Project7(void){
     //--------------------------------------------------------------------------
     // ARMED: 2-second countdown after SW1 repositioning press.
     //        Gives operator time to remove hands before motors start.
+    //        ALSO waits for the DAC ramp to finish (TBIE cleared by overflow
+    //        ISR when DAC_data reaches DAC_Adjust -- RED LED turns OFF).
+    //        Without this guard, Forward_On() fires while motor supply is still
+    //        too low (~2V) to overcome wheel static friction.
     //--------------------------------------------------------------------------
     case P7_ARMED:
         if(p7_timer == RESET_STATE){
@@ -435,7 +439,20 @@ void Run_Project7(void){
             strcpy(display_line[3], "          ");
             display_changed = TRUE;
         }
-        if(p7_timer >= P7_WAIT_START_TIME){
+        // 2-second countdown done but DAC ramp still in progress -- wait
+        if(p7_timer >= P7_WAIT_START_TIME && (TB0CTL & TBIE)){
+            if(p7_timer == P7_WAIT_START_TIME){
+                // Show once when countdown expires but ramp not done yet
+                strcpy(display_line[0], "Motor Pwr ");
+                strcpy(display_line[1], " Ramping  ");
+                strcpy(display_line[2], "Wait: RED ");
+                strcpy(display_line[3], "LED off.. ");
+                display_changed = TRUE;
+            }
+            // Stay here until overflow ISR clears TBIE (ramp complete)
+        }
+        // Both done: 2s elapsed AND ramp complete (TBIE cleared, RED LED off)
+        if(p7_timer >= P7_WAIT_START_TIME && !(TB0CTL & TBIE)){
             p7_timer = RESET_STATE;
             p7_state = P7_FORWARD;
 
