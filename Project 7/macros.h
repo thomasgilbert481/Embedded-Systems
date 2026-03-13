@@ -199,9 +199,10 @@
 //             LOWER register value  -->  HIGHER output voltage to motors
 //             HIGHER register value -->  LOWER output voltage to motors
 //
-//   DAC_Begin  (2725) --> ~2.0V DAC out --> motor supply too low to spin
-//   DAC_Limit  (850)  --> ~3.4V DAC out --> ~6.08V motor supply (ramp stops)
-//   DAC_Adjust (875)  --> ~3.4V DAC out --> ~6.00V motor supply (operating pt)
+//   DAC_Begin  (2725) --> ~2.20V DAC out --> motor supply too low to spin
+//   DAC_Limit  (850)  --> ~0.68V DAC out --> ~6.08V motor supply (ramp stops)
+//   DAC_Adjust (875)  --> ~0.70V DAC out --> ~6.00V motor supply (operating pt)
+//   (Vout = n/4096 * VCC; VCC = 3.3V on FR2355 LaunchPad)
 //
 // The ramp runs in the Timer B0 overflow ISR: DAC_data -= 100 each ~0.52s tick
 // until DAC_data <= DAC_Limit, then it is set to DAC_Adjust and overflow stops.
