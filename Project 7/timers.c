@@ -107,7 +107,7 @@ void Init_Timer_B0(void){
 //     TB3CCR2 -> P6.2 -> L_FORWARD   (LEFT_FORWARD_SPEED)
 //     TB3CCR3 -> P6.3 -> R_REVERSE   (RIGHT_REVERSE_SPEED)
 //     TB3CCR4 -> P6.4 -> L_REVERSE   (LEFT_REVERSE_SPEED)
-//     TB3CCR5 -> P6.5 -> LCD dim     (LCD_BACKLITE_DIMING, optional)
+//     TB3CCR5 -> not used (P6.5 kept as GPIO input; backlight on P6.0)
 //
 //   PWM period: WHEEL_PERIOD_VAL = 50005 cycles at 8 MHz SMCLK
 //              => ~6.25 ms period => ~160 Hz PWM frequency
@@ -141,8 +141,7 @@ void Init_Timer_B3(void){
     TB3CCTL4 = OUTMOD_7;              // Output mode 7: reset/set
     LEFT_REVERSE_SPEED = WHEEL_OFF;   // Start with motor off
 
-    // CCR5: LCD backlight dimming (P6.5, optional)
-    TB3CCTL5 = OUTMOD_7;              // Output mode 7: reset/set
-    LCD_BACKLITE_DIMING = PERCENT_80; // ~80% duty for backlight dimming
+    // CCR5: Not used -- P6.5 is left as GPIO input in ports.c.
+    // LCD backlight is toggled on P6.0 (GPIO) in the CCR0 ISR.
 //------------------------------------------------------------------------------
 }
