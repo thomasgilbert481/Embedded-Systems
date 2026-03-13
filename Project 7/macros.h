@@ -137,8 +137,8 @@
 #define WHEEL_PERIOD_VAL     (50005) // Timer B3 PWM period (~160 Hz at 8 MHz)
 #define FOLLOW_FAST          (35000) // ~70% duty -- straight-ahead burst speed
 #define FOLLOW_SPEED         (25000) // ~50% duty -- normal following speed
-#define FOLLOW_SLOW          (12000) // ~24% duty -- inner-wheel correction speed
-#define FOLLOW_SEARCH        (15000) // ~30% duty -- both-off search/recovery speed
+#define FOLLOW_SLOW          (20000) // ~40% duty -- inner-wheel correction (TUNED: was 12000)
+#define FOLLOW_SEARCH        (25000) // ~50% duty -- both-off search/recovery (TUNED: was 15000)
 #define SPIN_SPEED           (25000) // ~50% duty -- spin turns and alignment
 
 //------------------------------------------------------------------------------
