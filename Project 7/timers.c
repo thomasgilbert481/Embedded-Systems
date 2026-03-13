@@ -45,6 +45,10 @@ extern unsigned int DAC_data;               // Defined in dac.c
 volatile unsigned int dac_ramp_active  = 1; // 1 = ramp in progress
 volatile unsigned int dac_ramp_counter = 0; // Counts ISR ticks since Init_DAC
 
+// Display clock counter -- file scope (not local static) to avoid ULP Advisor
+// diagnostic #10372 which generates an unresolved 'remark' symbol at link time.
+static unsigned int display_timer_count = 0;
+
 // Keep P5/P6 externals for compatibility
 extern volatile unsigned int p5_timer;
 extern volatile unsigned int p5_running;
@@ -159,7 +163,6 @@ __interrupt void Timer0_B0_ISR(void){
     //   DISPLAY_TIMER_TICKS = 40 (40 * 5ms = 200ms = one 0.2s elapsed_tenth)
     //--------------------------------------------------------------------------
     if(p7_timer_running){
-        static unsigned int display_timer_count = 0;
         display_timer_count++;
         if(display_timer_count >= DISPLAY_TIMER_TICKS){
             display_timer_count = 0;

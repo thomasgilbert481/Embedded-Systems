@@ -245,6 +245,11 @@ SECTIONS
 /* INCLUDE PERIPHERALS MEMORY MAP                                           */
 /****************************************************************************/
 
+/* Precompiled instructor LCD object file -- defines display_line, display,
+   update_display, update_display_count, display_changed, Display_Update,
+   Init_LCD.  Must be linked; do not redefine any of these in source code. */
+LCD.obj
+
 -l msp430fr2355.cmd
 
 
