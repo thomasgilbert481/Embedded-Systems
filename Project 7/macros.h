@@ -89,29 +89,88 @@
 #define P6_ALIGNED         (5)  // Aligned -- displaying live black line ADC values
 
 //------------------------------------------------------------------------------
-// Project 6 Timing Constants (5ms per ISR tick, 200 ticks = 1 second)
+// Project 6 Timing Constants (200ms per ISR tick, 5 ticks = 1 second)
 //------------------------------------------------------------------------------
-// 1-second delay after SW1 before moving forward
 #define DETECT_DELAY_1SEC  (5)     // 5 x 200ms = 1.0 second
-
-// Duration to display "Black Line / Detected" message before turning
-// ~3 seconds allows the TA to see the display
 #define DETECT_STOP_TIME   (15)    // 15 x 200ms = 3.0 seconds
-
-// Turn duration -- TUNE ON YOUR HARDWARE
-// Start with ~2 ticks and adjust until both detectors end up over the line
 #define TURN_TIME          (2)     // 2 x 200ms = 0.4 second (adjust by testing)
 
-//------------------------------------------------------------------------------
-// Forward speed software PWM -- TUNE ON YOUR HARDWARE
-//   The ISR fires every 5ms.  Each PWM "period" is MOTOR_PWM_PERIOD ticks.
-//   The motor is ON for MOTOR_DUTY_CYCLE ticks, OFF for the rest.
-//
-//   HW06 note: software PWM removed from FORWARD state -- timer now fires at
-//   200ms intervals, which is too coarse for motor duty cycle control.
-//   Motors run at full speed in the FORWARD state.
-//------------------------------------------------------------------------------
-
 // end of Project 6 additions //////////////////////////////////////////////////
+
+// Project 7 additions /////////////////////////////////////////////////////////
+
+//------------------------------------------------------------------------------
+// Project 7 State Machine States
+//------------------------------------------------------------------------------
+#define P7_IDLE              (0)  // Waiting for SW1
+#define P7_CALIBRATE         (1)  // Three-phase calibration: ambient, white, black
+#define P7_WAIT_START        (2)  // Brief delay (~2 sec) for operator to step back
+#define P7_FORWARD           (3)  // Drive forward from circle center toward black line
+#define P7_DETECTED_STOP     (4)  // Brief stop on line detection (~1 sec) to confirm
+#define P7_TURNING           (5)  // Rotate to align both detectors over the line
+#define P7_FOLLOW_LINE       (6)  // Bang-bang line following -- core following state
+#define P7_EXIT_TURN         (7)  // After 2 laps, turn into circle center
+#define P7_DONE              (8)  // Stopped inside circle; timer frozen
+
+//------------------------------------------------------------------------------
+// Calibration sub-phases (used within P7_CALIBRATE)
+//------------------------------------------------------------------------------
+#define CAL_AMBIENT          (0)  // Emitter OFF: sample ambient light
+#define CAL_WHITE            (1)  // Emitter ON: sample white surface
+#define CAL_WAIT_BLACK       (2)  // Waiting for SW1 press to place on black tape
+#define CAL_BLACK            (3)  // Sample black line readings
+#define CAL_DONE             (4)  // Calibration complete
+
+//------------------------------------------------------------------------------
+// Calibration timing (in 200ms ISR ticks; ONE_SEC = 5 ticks)
+//------------------------------------------------------------------------------
+#define CAL_SAMPLE_DELAY     (5)   // 5 x 200ms = 1 second wait before sampling
+
+//------------------------------------------------------------------------------
+// Line following speeds (for hardware PWM via Timer B3)
+//   WHEEL_PERIOD_VAL is the Timer B3 CCR0 period (50005 cycles at 8 MHz SMCLK)
+//   Duty cycle = speed value / WHEEL_PERIOD_VAL
+//   WHEEL_OFF = 0 (0% duty cycle -- motor stopped)
+//   Must be less than WHEEL_PERIOD_VAL.
+//   NEVER set a forward AND reverse CCR to nonzero simultaneously.
+//------------------------------------------------------------------------------
+#define WHEEL_PERIOD_VAL     (50005) // Timer B3 PWM period (~160 Hz at 8 MHz)
+#define FOLLOW_FAST          (35000) // ~70% duty -- straight-ahead burst speed
+#define FOLLOW_SPEED         (25000) // ~50% duty -- normal following speed
+#define FOLLOW_SLOW          (12000) // ~24% duty -- inner-wheel correction speed
+#define FOLLOW_SEARCH        (15000) // ~30% duty -- both-off search/recovery speed
+#define SPIN_SPEED           (25000) // ~50% duty -- spin turns and alignment
+
+//------------------------------------------------------------------------------
+// Wait / delay times (in 200ms ISR ticks; ONE_SEC = 5 ticks)
+//------------------------------------------------------------------------------
+#define P7_WAIT_START_TIME   (10)    // 10 x 200ms = 2-second operator step-back delay
+#define P7_DETECT_STOP_TIME  (5)     // 5 x 200ms = 1-second pause after line detection
+#define P7_INITIAL_TURN_TIME (5)     // 5 x 200ms = 1-second alignment spin (TUNE THIS)
+
+//------------------------------------------------------------------------------
+// Line-following lap timing
+//   All in units of elapsed_tenths (0.2-second increments).
+//   Each CCR0 ISR tick = 200ms = 0.2s, so 1 elapsed_tenth = 1 tick.
+//   ONE_LAP_TIME_TENTHS: approximate time for one lap (TUNE ON HARDWARE)
+//   TWO_LAP_TIME_TENTHS: total for two laps before exit
+//------------------------------------------------------------------------------
+#define ONE_LAP_TIME_TENTHS  (100)   // 100 x 0.2s = 20 seconds per lap (TUNE THIS)
+#define TWO_LAP_TIME_TENTHS  (200)   // 200 x 0.2s = 40 seconds for 2 laps (TUNE THIS)
+
+//------------------------------------------------------------------------------
+// Exit maneuver timing (in 200ms ISR ticks)
+//------------------------------------------------------------------------------
+#define EXIT_TURN_TIME       (8)     // 8 x 200ms = 1.6-second spin into center (TUNE)
+#define EXIT_FORWARD_TIME    (5)     // 5 x 200ms = 1-second drive into center (TUNE)
+
+//------------------------------------------------------------------------------
+// 0.2-second display timer
+//   Timer B0 CCR0 fires every 200ms.  Each ISR tick IS one 0.2-second increment.
+//   DISPLAY_TIMER_TICKS = 1 means elapsed_tenths increments on every ISR tick.
+//------------------------------------------------------------------------------
+#define DISPLAY_TIMER_TICKS  (1)     // Each 200ms ISR tick = 1 elapsed_tenth (0.2s)
+
+// end of Project 7 additions //////////////////////////////////////////////////
 
 #endif /* MACROS_H_ */

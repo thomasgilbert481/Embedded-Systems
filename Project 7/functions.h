@@ -1,146 +1,51 @@
-//******************************************************************************
-//
-//  Description: This file contains the Function prototypes
-//
-//  Jim Carlson
-//  Aug 2013
-//  Built with IAR Embedded Workbench Version: V4.10A/W32 (5.40.1)
-//******************************************************************************
-// Functions
+//==============================================================================
+// File Name: functions.h
+// Description: Global function prototypes for Project 7 -- Circle Following.
+// Author: Thomas Gilbert
+// Date: Mar 2026
+// Compiler: Code Composer Studio
+//==============================================================================
 
-// Main
-void main(void);
+#ifndef FUNCTIONS_H_
+#define FUNCTIONS_H_
 
-// Initialization
-void Init_Conditions(void);
-
-// Interrupts
-void enable_interrupts(void);
-
-// Timer B0 ISRs (interrupts_timers.c)
-__interrupt void Timer0_B0_ISR(void);   // CCR0: 200ms backlight + display update
-__interrupt void TIMER0_B1_ISR(void);   // CCR1/CCR2: SW1/SW2 debounce timers
-
-// Port ISRs (interrupt_ports.c)
-__interrupt void switch1_interrupt(void); // PORT4_VECTOR: SW1 press (P4.1)
-__interrupt void switch2_interrupt(void); // PORT2_VECTOR: SW2 press (P2.3)
-
-// Debounce counters (defined in interrupts_timers.c)
-extern volatile unsigned int sw1_debounce_count;
-extern volatile unsigned int sw2_debounce_count;
-
-// Analog to Digital Converter
-
-// Clocks
-void Init_Clocks(void);
-
-// LED Configurations
-void Init_LEDs(void);
-void IR_LED_control(char selection);
-void Backlite_control(char selection);
-
-  // LCD
-void Display_Process(void);
-void Display_Update(char p_L1,char p_L2,char p_L3,char p_L4);
-void enable_display_update(void);
-void update_string(char *string_data, int string);
-void Init_LCD(void);
-void lcd_clear(void);
-void lcd_putc(char c);
-void lcd_puts(char *s);
-
-void lcd_power_on(void);
-void lcd_write_line1(void);
-void lcd_write_line2(void);
-//void lcd_draw_time_page(void);
-//void lcd_power_off(void);
-void lcd_enter_sleep(void);
-void lcd_exit_sleep(void);
-//void lcd_write(unsigned char c);
-//void out_lcd(unsigned char c);
-
-void Write_LCD_Ins(char instruction);
-void Write_LCD_Data(char data);
-void ClrDisplay(void);
-void ClrDisplay_Buffer_0(void);
-void ClrDisplay_Buffer_1(void);
-void ClrDisplay_Buffer_2(void);
-void ClrDisplay_Buffer_3(void);
-
-void SetPostion(char pos);
-void DisplayOnOff(char data);
-void lcd_BIG_mid(void);
-void lcd_BIG_bot(void);
-void lcd_120(void);
-
-void lcd_4line(void);
-void lcd_out(char *s, char line, char position);
-void lcd_rotate(char view);
-
-//void lcd_write(char data, char command);
-void lcd_write(unsigned char c);
-void lcd_write_line1(void);
-void lcd_write_line2(void);
-void lcd_write_line3(void);
-
-void lcd_command( char data);
-void LCD_test(void);
-void LCD_iot_meassage_print(int nema_index);
-
-// Menu
-void Menu_Process(void);
-
-// Ports
+//------------------------------------------------------------------------------
+// Initialization functions
+//------------------------------------------------------------------------------
 void Init_Ports(void);
 void Init_Port1(void);
 void Init_Port2(void);
-//void Init_Port3(char smclk);
 void Init_Port3(void);
 void Init_Port4(void);
 void Init_Port5(void);
 void Init_Port6(void);
 
-// SPI
-void Init_SPI_B1(void);
-void SPI_B1_write(char byte);
-void spi_rs_data(void);
-void spi_rs_command(void);
-void spi_LCD_idle(void);
-void spi_LCD_active(void);
-void SPI_test(void);
-void WriteIns(char instruction);
-void WriteData(char data);
+void Init_Clocks(void);
+void Init_Conditions(void);
+void enable_interrupts(void);
 
-// Switches
-void Init_Switches(void);
-void switch_control(void);
-void enable_switch_SW1(void);
-void enable_switch_SW2(void);
-void disable_switch_SW1(void);
-void disable_switch_SW2(void);
-void Switches_Process(void);
-void Init_Switch(void);
-void Switch_Process(void);
-void Switch1_Process(void);
-void Switch2_Process(void);
-void menu_act(void);
-void menu_select(void);
-
-// Timers
 void Init_Timers(void);
 void Init_Timer_B0(void);
-void Init_Timer_B1(void);
-void Init_Timer_B2(void);
-void Init_Timer_B3(void);
+void Init_Timer_B3(void);        // Hardware PWM for motor control (Project 7)
 
-void usleep(unsigned int usec);
-void usleep10(unsigned int usec);
-void five_msec_sleep(unsigned int msec);
-void measure_delay(void);
-void out_control_words(void);
+void Init_LEDs(void);
+void Init_LCD(void);
+void Init_ADC(void);
 
+//------------------------------------------------------------------------------
+// LCD / Display functions
+//------------------------------------------------------------------------------
+void Display_Process(void);
+void Display_Update(void);
 
-// Wheel control functions (Project 5)
+//------------------------------------------------------------------------------
+// ADC / Conversion functions
+//------------------------------------------------------------------------------
+void HexToBCD(int hex_value);
+
+//------------------------------------------------------------------------------
+// Motor control functions (hardware PWM via Timer B3)
+//------------------------------------------------------------------------------
 void Wheels_All_Off(void);
 void Forward_On(void);
 void Forward_Off(void);
@@ -148,12 +53,16 @@ void Reverse_On(void);
 void Reverse_Off(void);
 void Spin_CW_On(void);
 void Spin_CCW_On(void);
-void Run_Project5(void);
 
-// ADC functions (Project 6)
-void Init_ADC(void);
-void HexToBCD(int hex_value);
+//------------------------------------------------------------------------------
+// Switch polling (stub -- switch handling is interrupt-driven)
+//------------------------------------------------------------------------------
+void Switches_Process(void);
 
-// Project 6 state machine
-void Run_Project6(void);
+//------------------------------------------------------------------------------
+// Project 7 state machine and display
+//------------------------------------------------------------------------------
+void Run_Project7(void);
+void Update_P7_Display(void);
 
+#endif /* FUNCTIONS_H_ */

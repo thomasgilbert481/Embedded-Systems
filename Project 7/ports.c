@@ -1,10 +1,12 @@
 //==============================================================================
 // File Name: ports.c
 // Description: Port initialization for MSP430FR2355
-//              Configures all GPIO pins based on hardware connections
+//              Configures all GPIO pins based on hardware connections.
+//              Project 7: Motor pins (P6.1-P6.4) configured for Timer B3
+//              hardware PWM output mode (SEL0=1, SEL1=0).
 // Author: Thomas Gilbert
-// Date: 2/4/2026
-// Compiler: Code Composer Studio [version]
+// Date: Mar 2026
+// Compiler: Code Composer Studio
 //
 // Pin configurations based on:
 // - MSP-EXP430FR2355 LaunchPad schematic
@@ -46,13 +48,13 @@ void Init_Ports(void){ //Init all ports
              P1OUT &= ~A1_SEEED; // Initial Value = Low / Off
              P1DIR &= ~A1_SEEED; // Direction = input
 
-             // V_DETECT_L � P1.2 as ADC input (channel A2, Left IR detector)
+             // V_DETECT_L - P1.2 as ADC input (channel A2, Left IR detector)
              P1SEL0 |=  V_DETECT_L; // ADC function: SEL0 = 1
              P1SEL1 |=  V_DETECT_L; // ADC function: SEL1 = 1
              P1OUT &= ~V_DETECT_L; // Initial Value = Low
              P1DIR &= ~V_DETECT_L; // Direction = input (ADC)
 
-             // V_DETECT_R � P1.3 as ADC input (channel A3, Right IR detector)
+             // V_DETECT_R - P1.3 as ADC input (channel A3, Right IR detector)
              P1SEL0 |=  V_DETECT_R; // ADC function: SEL0 = 1
              P1SEL1 |=  V_DETECT_R; // ADC function: SEL1 = 1
              P1OUT &= ~V_DETECT_R; // Initial Value = Low
@@ -63,7 +65,7 @@ void Init_Ports(void){ //Init all ports
              P1OUT &= ~A4_SEEED; // Initial Value = Low / Off
              P1DIR &= ~A4_SEEED; // Direction = input
 
-             // V_THUMB � P1.5 as ADC input (channel A5, Thumbwheel potentiometer)
+             // V_THUMB - P1.5 as ADC input (channel A5, Thumbwheel potentiometer)
              P1SEL0 |=  V_THUMB; // ADC function: SEL0 = 1
              P1SEL1 |=  V_THUMB; // ADC function: SEL1 = 1
              P1OUT &= ~V_THUMB; // Initial Value = Low
@@ -98,7 +100,7 @@ void Init_Ports(void){ //Init all ports
 
          P2SEL0 &= ~IR_LED; // P2_2 GPIO operation
          P2SEL1 &= ~IR_LED; // P2_2 GPIO operation
-         P2OUT &= ~IR_LED; // Initial Value = Low / Off
+         P2OUT &= ~IR_LED; // Initial Value = Low / Off (OFF at startup)
          P2DIR |= IR_LED; // Direction = output
 
          P2SEL0 &= ~SW2; // SW2 Operation
@@ -123,7 +125,7 @@ void Init_Ports(void){ //Init all ports
          P2SEL0 &= ~LFXIN; // LFXIN Clock operation
          P2SEL1 |= LFXIN; // LFXIN Clock operation
 
-         // SW2 interrupt configuration (HW06: interrupt-driven debounce)
+         // SW2 interrupt configuration (interrupt-driven debounce)
          P2IES |=  SW2;    // High-to-low edge trigger (button press with pull-up)
          P2IFG &= ~SW2;    // Clear any pending SW2 interrupt flag
          P2IE  |=  SW2;    // Enable SW2 port interrupt
@@ -216,7 +218,7 @@ void Init_Ports(void){ //Init all ports
      P4SEL0 |= UCB1SOMI; // UCB1SOMI SPI BUS operation
      P4SEL1 &= ~UCB1SOMI; // UCB1SOMI SPI BUS operation
 
-     // SW1 interrupt configuration (HW06: interrupt-driven debounce)
+     // SW1 interrupt configuration (interrupt-driven debounce)
      P4IES |=  SW1;    // High-to-low edge trigger (button press with pull-up)
      P4IFG &= ~SW1;    // Clear any pending SW1 interrupt flag
      P4IE  |=  SW1;    // Enable SW1 port interrupt
@@ -260,45 +262,41 @@ void Init_Ports(void){ //Init all ports
         P6OUT = 0x00;
         P6DIR = 0x00; //direction to OUTPUT
 
-        // LCD Backlight
+        // LCD Backlight (P6.0) -- GPIO output, toggled in CCR0 ISR
         P6SEL0 &= ~LCD_BACKLITE;
         P6SEL1 &= ~LCD_BACKLITE;
-        P6OUT &= ~LCD_BACKLITE;       // Backlight OFF (save battery)
-        P6DIR |= LCD_BACKLITE;       // Output
+        P6OUT &= ~LCD_BACKLITE;       // Backlight OFF at startup
+        P6DIR |= LCD_BACKLITE;        // Output
 
-        // Right Forward Motor
-        P6SEL0 &= ~R_FORWARD;
-        P6SEL1 &= ~R_FORWARD;
-        P6OUT &= ~R_FORWARD;         // Initially OFF
-        P6DIR |= R_FORWARD;          // *** OUTPUT ***
+        // Right Forward Motor (P6.1) -- Timer B3 CCR1 PWM output
+        P6SEL0 |=  R_FORWARD;         // Timer B3 function: SEL0 = 1
+        P6SEL1 &= ~R_FORWARD;         // Timer B3 function: SEL1 = 0
+        P6DIR  |=  R_FORWARD;         // Output direction required for timer output
 
-        // Left Forward Motor
-        P6SEL0 &= ~L_FORWARD;
-        P6SEL1 &= ~L_FORWARD;
-        P6OUT &= ~L_FORWARD;         // Initially OFF
-        P6DIR |= L_FORWARD;          // *** OUTPUT ***
+        // Left Forward Motor (P6.2) -- Timer B3 CCR2 PWM output
+        P6SEL0 |=  L_FORWARD;         // Timer B3 function: SEL0 = 1
+        P6SEL1 &= ~L_FORWARD;         // Timer B3 function: SEL1 = 0
+        P6DIR  |=  L_FORWARD;         // Output direction required for timer output
 
-        // Right Reverse Motor
-        P6SEL0 &= ~R_REVERSE;
-        P6SEL1 &= ~R_REVERSE;
-        P6OUT &= ~R_REVERSE;         // OFF
-        P6DIR |= R_REVERSE;          // *** OUTPUT ***
+        // Right Reverse Motor (P6.3) -- Timer B3 CCR3 PWM output
+        P6SEL0 |=  R_REVERSE;         // Timer B3 function: SEL0 = 1
+        P6SEL1 &= ~R_REVERSE;         // Timer B3 function: SEL1 = 0
+        P6DIR  |=  R_REVERSE;         // Output direction required for timer output
 
-        // Left Reverse Motor
-        P6SEL0 &= ~L_REVERSE;
-        P6SEL1 &= ~L_REVERSE;
-        P6OUT &= ~L_REVERSE;         // OFF
-        P6DIR |= L_REVERSE;          // *** OUTPUT ***
+        // Left Reverse Motor (P6.4) -- Timer B3 CCR4 PWM output
+        P6SEL0 |=  L_REVERSE;         // Timer B3 function: SEL0 = 1
+        P6SEL1 &= ~L_REVERSE;         // Timer B3 function: SEL1 = 0
+        P6DIR  |=  L_REVERSE;         // Output direction required for timer output
 
-        // P6.5 unused
+        // P6.5 unused -- keep as GPIO input
         P6SEL0 &= ~P6_5;
         P6SEL1 &= ~P6_5;
         P6OUT &= ~P6_5;
-        P6DIR &= ~P6_5;              // Input (unused)
+        P6DIR &= ~P6_5;               // Input (unused)
 
-        // Green LED
+        // Green LED (P6.6) -- GPIO output
         P6SEL0 &= ~GRN_LED;
         P6SEL1 &= ~GRN_LED;
         P6OUT &= ~GRN_LED;
-        P6DIR |= GRN_LED;            // Output
+        P6DIR |= GRN_LED;             // Output
     }

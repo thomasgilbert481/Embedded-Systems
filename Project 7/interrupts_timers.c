@@ -1,9 +1,14 @@
 //******************************************************************************
 // File Name:    interrupts_timers.c
-// Description:  Timer B0 interrupt service routines for Homework 06.
+// Description:  Timer B0 interrupt service routines for Project 7.
 //               Contains two ISRs:
 //                 Timer0_B0_ISR -- CCR0, fires every 200ms
 //                 TIMER0_B1_ISR -- CCR1, CCR2, and overflow (shared vector)
+//
+//               Project 7 additions to CCR0 ISR:
+//                 - p7_timer: incremented when p7_running is TRUE
+//                 - elapsed_tenths: incremented when p7_timer_running is TRUE
+//                   (each 200ms tick = 0.2s = 1 elapsed_tenth)
 //
 // Author:       Thomas Gilbert
 // Date:         Mar 2026
@@ -32,21 +37,31 @@ extern volatile char         one_time;
 // From LCD.obj (display subsystem)
 extern volatile unsigned char update_display;
 
-// From main.c (Project 6 state machine)
-extern volatile unsigned int p6_timer;
-extern volatile unsigned int p6_running;
+// From main.c (Project 7 state machine timing)
+extern volatile unsigned int p7_timer;          // P7 state delay counter
+extern volatile unsigned int p7_running;        // TRUE = ISR increments p7_timer
+
+// From main.c (Project 7 display clock)
+extern volatile unsigned int elapsed_tenths;    // 0.2-second display counter
+extern volatile unsigned int p7_timer_running;  // TRUE = ISR increments elapsed_tenths
 
 //==============================================================================
 // ISR: Timer0_B0_ISR
 // Description:  Timer B0 CCR0 interrupt -- fires every 200ms.
 //               Toggles LCD backlight, signals display update, advances the
-//               Time_Sequence counter, and increments the Project 6 timer.
+//               Time_Sequence counter, and increments Project 7 timers.
+//
+//               Each tick = 200ms = 0.2 seconds.
+//               p7_timer counts 200ms ticks for state machine delays.
+//               elapsed_tenths counts 0.2-second display increments.
 //
 // Interrupt Source:  Timer B0 CCR0
 // Trigger:           TB0R reaches TB0CCR0 value (in continuous mode)
 //
-// Globals used:    Time_Sequence, p6_running, p6_timer
-// Globals changed: Time_Sequence, one_time, update_display, p6_timer
+// Globals used:    Time_Sequence, p7_running, p7_timer, p7_timer_running,
+//                  elapsed_tenths
+// Globals changed: Time_Sequence, one_time, update_display, p7_timer,
+//                  elapsed_tenths
 // Local variables: none
 //==============================================================================
 #pragma vector = TIMER0_B0_VECTOR
@@ -71,9 +86,21 @@ __interrupt void Timer0_B0_ISR(void){
         one_time = TRUE;
     }
 
-    // Project 6 state machine timer -- only counts when the sequence is active
-    if(p6_running){
-        p6_timer++;
+    //--------------------------------------------------------------------------
+    // Project 7 state machine timer -- only counts when sequence is active
+    // Incremented every 200ms tick when p7_running is TRUE.
+    //--------------------------------------------------------------------------
+    if(p7_running){
+        p7_timer++;
+    }
+
+    //--------------------------------------------------------------------------
+    // Project 7 display clock (0.2-second resolution)
+    // Each ISR tick IS 200ms = 0.2s, so one elapsed_tenth per tick.
+    // Only increments when p7_timer_running is TRUE (car is moving).
+    //--------------------------------------------------------------------------
+    if(p7_timer_running){
+        elapsed_tenths++;
     }
 
     // Re-arm CCR0 for the next interrupt (continuous mode requires manual re-arm)
