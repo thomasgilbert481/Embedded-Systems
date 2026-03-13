@@ -1,14 +1,15 @@
 //******************************************************************************
 // File Name:    timers.c
-// Description:  Timer initialization for Homework 06.
+// Description:  Timer initialization for Project 7.
 //               Configures Timer B0 in continuous mode for:
-//                 CCR0 -- 200ms backlight blink + display update
+//                 CCR0 -- 200ms backlight blink + display update + P7 timers
 //                 CCR1 -- SW1 interrupt-driven debounce
 //                 CCR2 -- SW2 interrupt-driven debounce
+//               Also configures Timer B3 for hardware PWM motor control.
 //
 //               Clock math (SMCLK = 8 MHz, ID__8, TBIDEX__8):
 //                 Effective clock = 8,000,000 / 8 / 8 = 125,000 Hz
-//                 TB0CCR0 = 125,000 / (1 / 0.200s) = 25,000 counts = 200ms
+//                 TB0CCR0 = 125,000 / 5 = 25,000 counts = 200ms
 //
 // Author:       Thomas Gilbert
 // Date:         Mar 2026
@@ -30,14 +31,11 @@ volatile char         one_time      = FALSE;
 //==============================================================================
 // Function: Init_Timers
 // Description: Calls individual timer initialization functions.
-//              Add Init_Timer_B1/B2/B3 calls here if they are needed later.
 //==============================================================================
 void Init_Timers(void){
 //------------------------------------------------------------------------------
-// Globals used:    none
-// Globals changed: none
-//------------------------------------------------------------------------------
     Init_Timer_B0();
+    Init_Timer_B3();   // Hardware PWM for motor control (Project 7)
 }
 
 //==============================================================================
@@ -53,9 +51,6 @@ void Init_Timers(void){
 //              TBIDEX divider: /8 (TBIDEX__8)
 //              Effective clock: 8,000,000 / 8 / 8 = 125,000 Hz
 //              CCR0 count:    125,000 / 5 = 25,000  =>  200ms interval
-//
-//              CRITICAL: TBCLR must be written AFTER ID and TBIDEX are set
-//              so that all internal divider flip-flops are reset correctly.
 //
 // Globals used:    none
 // Globals changed: none
@@ -97,4 +92,57 @@ void Init_Timer_B0(void){
     //--------------------------------------------------------------------------
     TB0CTL &= ~TBIE;              // Disable overflow interrupt
     TB0CTL &= ~TBIFG;             // Clear overflow interrupt flag
+}
+
+//==============================================================================
+// Function: Init_Timer_B3
+// Description: Configures Timer B3 for hardware PWM on motor pins.
+//              Up mode: counts from 0 to TB3CCR0, then resets.
+//              All motor channels use output mode 7 (reset/set):
+//                pin HIGH at period start, LOW when CCR count reached.
+//              Setting a CCR to WHEEL_OFF (0) keeps the output LOW (motor off).
+//
+//   Pin mapping (Port 6, SEL0=1 SEL1=0 required in ports.c):
+//     TB3CCR1 -> P6.1 -> R_FORWARD   (RIGHT_FORWARD_SPEED)
+//     TB3CCR2 -> P6.2 -> L_FORWARD   (LEFT_FORWARD_SPEED)
+//     TB3CCR3 -> P6.3 -> R_REVERSE   (RIGHT_REVERSE_SPEED)
+//     TB3CCR4 -> P6.4 -> L_REVERSE   (LEFT_REVERSE_SPEED)
+//     TB3CCR5 -> P6.5 -> LCD dim     (LCD_BACKLITE_DIMING, optional)
+//
+//   PWM period: WHEEL_PERIOD_VAL = 50005 cycles at 8 MHz SMCLK
+//              => ~6.25 ms period => ~160 Hz PWM frequency
+//
+// Globals used:    none
+// Globals changed: none
+// Local variables: none
+//==============================================================================
+void Init_Timer_B3(void){
+//------------------------------------------------------------------------------
+
+    TB3CTL  = TBSSEL__SMCLK;          // Clock source = SMCLK (8 MHz), no dividers
+    TB3CTL |= MC__UP;                 // Up mode: count 0 -> TB3CCR0, then reset
+    TB3CTL |= TBCLR;                  // Clear the timer counter and dividers
+
+    TB3CCR0 = WHEEL_PERIOD_VAL;       // PWM period: 50005 cycles = ~6.25 ms
+
+    // CCR1: Right Forward (P6.1, R_FORWARD)
+    TB3CCTL1 = OUTMOD_7;              // Output mode 7: reset/set
+    RIGHT_FORWARD_SPEED = WHEEL_OFF;  // Start with motor off (0% duty cycle)
+
+    // CCR2: Left Forward (P6.2, L_FORWARD)
+    TB3CCTL2 = OUTMOD_7;              // Output mode 7: reset/set
+    LEFT_FORWARD_SPEED = WHEEL_OFF;   // Start with motor off
+
+    // CCR3: Right Reverse (P6.3, R_REVERSE)
+    TB3CCTL3 = OUTMOD_7;              // Output mode 7: reset/set
+    RIGHT_REVERSE_SPEED = WHEEL_OFF;  // Start with motor off
+
+    // CCR4: Left Reverse (P6.4, L_REVERSE)
+    TB3CCTL4 = OUTMOD_7;              // Output mode 7: reset/set
+    LEFT_REVERSE_SPEED = WHEEL_OFF;   // Start with motor off
+
+    // CCR5: LCD backlight dimming (P6.5, optional)
+    TB3CCTL5 = OUTMOD_7;              // Output mode 7: reset/set
+    LCD_BACKLITE_DIMING = PERCENT_80; // ~80% duty for backlight dimming
+//------------------------------------------------------------------------------
 }

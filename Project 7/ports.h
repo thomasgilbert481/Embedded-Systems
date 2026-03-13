@@ -5,12 +5,24 @@
 #define SMCLK_ON               (0x01) //
 #define PORTS                  (0x00) // RED LED 0
 #define PWM_MODE               (0x01) // GREEN LED 1
-#define WHEEL_OFF              (0x00)
-#define WHEEL_PERIOD          (10000)
-#define RIGHT_FORWARD_SPEED (TB3CCR2)
-#define RIGHT_REVERSE_SPEED (TB3CCR3)
-#define LEFT_FORWARD_SPEED  (TB3CCR4)
-#define LEFT_REVERSE_SPEED  (TB3CCR5)
+#define WHEEL_OFF              (0x00) // Motor stopped (0% PWM duty cycle)
+#define WHEEL_PERIOD          (10000) // Legacy -- not used for Timer B3 PWM
+#define PERCENT_80            (40004) // 40004/50005 = ~80% duty for LCD backlight
+
+//------------------------------------------------------------------------------
+// Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins
+//   P6.1 = R_FORWARD (0x02) --> TB3CCR1
+//   P6.2 = L_FORWARD (0x04) --> TB3CCR2
+//   P6.3 = R_REVERSE (0x08) --> TB3CCR3
+//   P6.4 = L_REVERSE (0x10) --> TB3CCR4
+//   P6.5 = backlight dim    --> TB3CCR5 (LCD_BACKLITE_DIMING)
+//------------------------------------------------------------------------------
+#define RIGHT_FORWARD_SPEED (TB3CCR1)  // P6.1 R_FORWARD
+#define LEFT_FORWARD_SPEED  (TB3CCR2)  // P6.2 L_FORWARD
+#define RIGHT_REVERSE_SPEED (TB3CCR3)  // P6.3 R_REVERSE
+#define LEFT_REVERSE_SPEED  (TB3CCR4)  // P6.4 L_REVERSE
+#define LCD_BACKLITE_DIMING (TB3CCR5)  // P6.5 LCD backlight PWM dim
+
 #define STEP                   (2000)
 #define FORWARD                (0x00) // FORWARD
 #define REVERSE                (0x01) // REVERSE
@@ -64,10 +76,10 @@
 #define IOT_BOOT_CPU           (0x10) // 5.4 IOT_BOOT           1
 
 // Port 6 Pins
-#define LCD_BACKLITE           (0x01) // 6.0 LCD_BACKLITE
-#define R_FORWARD              (0x02) // 6.1 P6_0_PWM
-#define L_FORWARD              (0x04) // 6.2 P6_1_PWM
-#define R_REVERSE              (0x08) // 6.3 P6_2_PWM
-#define L_REVERSE              (0x10) // 6.4 P6_3_PWM
-#define P6_5                   (0x20) // 6.5
+#define LCD_BACKLITE           (0x01) // 6.0 LCD_BACKLITE (GPIO toggle)
+#define R_FORWARD              (0x02) // 6.1 Right Forward  --> TB3CCR1 PWM
+#define L_FORWARD              (0x04) // 6.2 Left Forward   --> TB3CCR2 PWM
+#define R_REVERSE              (0x08) // 6.3 Right Reverse  --> TB3CCR3 PWM
+#define L_REVERSE              (0x10) // 6.4 Left Reverse   --> TB3CCR4 PWM
+#define P6_5                   (0x20) // 6.5 (unused GPIO / optional TB3CCR5)
 #define GRN_LED                (0x40) // 6.6 GREEN LED

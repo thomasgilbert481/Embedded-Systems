@@ -1,108 +1,102 @@
 //==============================================================================
 // File Name: wheels.c
-// Description: Wheel motor control for Project 5
-//              Full H-Bridge: forward, reverse, and spin functions
-//              CRITICAL: Always turn off opposite direction BEFORE engaging!
+// Description: Motor control functions for Project 7 using Timer B3 hardware PWM.
+//              H-Bridge safety: NEVER set a forward AND reverse CCR to nonzero
+//              simultaneously on the same wheel. Always clear the opposite
+//              direction before engaging the desired direction.
+//
+//              PWM CCR register mapping (defined in ports.h):
+//                RIGHT_FORWARD_SPEED = TB3CCR1  (P6.1, R_FORWARD)
+//                LEFT_FORWARD_SPEED  = TB3CCR2  (P6.2, L_FORWARD)
+//                RIGHT_REVERSE_SPEED = TB3CCR3  (P6.3, R_REVERSE)
+//                LEFT_REVERSE_SPEED  = TB3CCR4  (P6.4, L_REVERSE)
+//
+//              Speed range: WHEEL_OFF (0) to WHEEL_PERIOD_VAL (50005)
+//              Default drive speed: FOLLOW_SPEED (25000, ~50% duty)
+//              Spin speed:          SPIN_SPEED   (25000, ~50% duty)
+//
 // Author: Thomas Gilbert
-// Date: Feb 2026
+// Date: Mar 2026
 // Compiler: Code Composer Studio
 //==============================================================================
 
-#include "msp430.h"       // MSP430 register definitions
-#include "functions.h"    // Function prototypes
-#include "macros.h"       // Project-wide #define constants
-#include "ports.h"        // Port pin definitions (R_FORWARD, L_FORWARD, etc.)
+#include "msp430.h"
+#include "functions.h"
+#include "macros.h"
+#include "ports.h"
 
 //==============================================================================
 // Function: Wheels_All_Off
-// Description: Turns off ALL motor pins (forward AND reverse, both wheels).
-//              This is the safest function — call it before any direction change.
+// Description: Kills all motor PWM outputs immediately.
+//              Call this before ANY direction change (H-bridge safety).
 //==============================================================================
 void Wheels_All_Off(void){
-    P6OUT &= ~R_FORWARD;     // Right forward OFF
-    P6OUT &= ~L_FORWARD;     // Left forward OFF
-    P6OUT &= ~R_REVERSE;     // Right reverse OFF
-    P6OUT &= ~L_REVERSE;     // Left reverse OFF
+    LEFT_FORWARD_SPEED  = WHEEL_OFF;   // Left forward PWM off
+    RIGHT_FORWARD_SPEED = WHEEL_OFF;   // Right forward PWM off
+    LEFT_REVERSE_SPEED  = WHEEL_OFF;   // Left reverse PWM off
+    RIGHT_REVERSE_SPEED = WHEEL_OFF;   // Right reverse PWM off
 }
 
 //==============================================================================
 // Function: Forward_On
-// Description: Drives both wheels forward.
-//              SAFETY: Turns off reverse pins FIRST to prevent H-bridge damage.
+// Description: Drives both wheels forward at FOLLOW_SPEED.
+//              SAFETY: Clears reverse CCRs first.
 //==============================================================================
 void Forward_On(void){
-    P6OUT &= ~R_REVERSE;     // Right reverse OFF first (SAFETY)
-    P6OUT &= ~L_REVERSE;     // Left reverse OFF first (SAFETY)
-    P6OUT |= R_FORWARD;      // Right forward ON
-    P6OUT |= L_FORWARD;      // Left forward ON
+    LEFT_REVERSE_SPEED  = WHEEL_OFF;       // Clear reverse first (SAFETY)
+    RIGHT_REVERSE_SPEED = WHEEL_OFF;       // Clear reverse first (SAFETY)
+    LEFT_FORWARD_SPEED  = FOLLOW_SPEED;    // Set left wheel forward
+    RIGHT_FORWARD_SPEED = FOLLOW_SPEED;    // Set right wheel forward
 }
 
 //==============================================================================
 // Function: Forward_Off
-// Description: Turns off both forward motor pins.
+// Description: Stops forward motion without engaging reverse.
 //==============================================================================
 void Forward_Off(void){
-    P6OUT &= ~R_FORWARD;     // Right forward OFF
-    P6OUT &= ~L_FORWARD;     // Left forward OFF
+    LEFT_FORWARD_SPEED  = WHEEL_OFF;   // Stop left forward
+    RIGHT_FORWARD_SPEED = WHEEL_OFF;   // Stop right forward
 }
 
 //==============================================================================
 // Function: Reverse_On
-// Description: Drives both wheels in reverse.
-//              SAFETY: Turns off forward pins FIRST to prevent H-bridge damage.
+// Description: Drives both wheels in reverse at FOLLOW_SPEED.
+//              SAFETY: Clears forward CCRs first.
 //==============================================================================
 void Reverse_On(void){
-    P6OUT &= ~R_FORWARD;     // Right forward OFF first (SAFETY)
-    P6OUT &= ~L_FORWARD;     // Left forward OFF first (SAFETY)
-    P6OUT |= R_REVERSE;      // Right reverse ON
-    P6OUT |= L_REVERSE;      // Left reverse ON
+    LEFT_FORWARD_SPEED  = WHEEL_OFF;       // Clear forward first (SAFETY)
+    RIGHT_FORWARD_SPEED = WHEEL_OFF;       // Clear forward first (SAFETY)
+    LEFT_REVERSE_SPEED  = FOLLOW_SPEED;    // Set left wheel reverse
+    RIGHT_REVERSE_SPEED = FOLLOW_SPEED;    // Set right wheel reverse
 }
 
 //==============================================================================
 // Function: Reverse_Off
-// Description: Turns off both reverse motor pins.
+// Description: Stops reverse motion without engaging forward.
 //==============================================================================
 void Reverse_Off(void){
-    P6OUT &= ~R_REVERSE;     // Right reverse OFF
-    P6OUT &= ~L_REVERSE;     // Left reverse OFF
+    LEFT_REVERSE_SPEED  = WHEEL_OFF;   // Stop left reverse
+    RIGHT_REVERSE_SPEED = WHEEL_OFF;   // Stop right reverse
 }
 
 //==============================================================================
 // Function: Spin_CW_On
-// Description: Spins the vehicle clockwise (in place).
-//              Left wheel goes forward, Right wheel goes reverse.
-//              SAFETY: Calls Wheels_All_Off() first.
+// Description: Spins clockwise in place (left forward, right reverse).
+//              SAFETY: All-off first, then set opposite wheels.
 //==============================================================================
 void Spin_CW_On(void){
-    Wheels_All_Off();         // Everything off first (SAFETY)
-    P6OUT |= L_FORWARD;      // Left wheel forward
-    P6OUT |= R_REVERSE;      // Right wheel reverse
+    Wheels_All_Off();                      // Everything off first (SAFETY)
+    LEFT_FORWARD_SPEED  = SPIN_SPEED;     // Left wheel forward
+    RIGHT_REVERSE_SPEED = SPIN_SPEED;     // Right wheel reverse
 }
 
 //==============================================================================
 // Function: Spin_CCW_On
-// Description: Spins the vehicle counter-clockwise (in place).
-//              Right wheel goes forward, Left wheel goes reverse.
-//              SAFETY: Calls Wheels_All_Off() first.
+// Description: Spins counter-clockwise in place (right forward, left reverse).
+//              SAFETY: All-off first, then set opposite wheels.
 //==============================================================================
 void Spin_CCW_On(void){
-    Wheels_All_Off();         // Everything off first (SAFETY)
-    P6OUT |= R_FORWARD;      // Right wheel forward
-    P6OUT |= L_REVERSE;      // Left wheel reverse
-}
-
-//==============================================================================
-// These old Project 4 functions are kept as stubs so nothing breaks if
-// referenced. You can remove them once you've cleaned up all references.
-//==============================================================================
-void Forward_Move(void){
-    // Not used in Project 5 — software PWM no longer needed
-}
-
-void Wheels_Forward(void){
-    Forward_On();  // Just alias to safe version
-}
-
-void Wheels_Off(void){
-    Wheels_All_Off();  // Just alias to safe version
+    Wheels_All_Off();                      // Everything off first (SAFETY)
+    RIGHT_FORWARD_SPEED = SPIN_SPEED;     // Right wheel forward
+    LEFT_REVERSE_SPEED  = SPIN_SPEED;     // Left wheel reverse
 }
