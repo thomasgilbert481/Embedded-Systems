@@ -68,9 +68,6 @@ extern volatile unsigned int p7_timer_running;  // TRUE = ISR increments elapsed
 __interrupt void Timer0_B0_ISR(void){
 //------------------------------------------------------------------------------
 
-    // Toggle LCD backlight (creates 2.5 Hz blink -- 200ms on, 200ms off)
-    P6OUT ^= LCD_BACKLITE;
-
     // Signal the main loop that it is time to refresh the display
     update_display = TRUE;
 
@@ -142,7 +139,6 @@ __interrupt void TIMER0_B1_ISR(void){
                 TB0CCTL1  &= ~CCIE;           // Disable CCR1 interrupt
                 P4IFG     &= ~SW1;            // Clear any pending SW1 flag
                 P4IE      |=  SW1;            // Re-enable SW1 port interrupt
-                TB0CCTL0  |=  CCIE;           // Re-enable backlight (CCR0) interrupt
             }
             TB0CCR1 += TB0CCR1_INTERVAL;      // Re-arm CCR1 for next 200ms
             break;
@@ -153,7 +149,6 @@ __interrupt void TIMER0_B1_ISR(void){
                 TB0CCTL2  &= ~CCIE;           // Disable CCR2 interrupt
                 P2IFG     &= ~SW2;            // Clear any pending SW2 flag
                 P2IE      |=  SW2;            // Re-enable SW2 port interrupt
-                TB0CCTL0  |=  CCIE;           // Re-enable backlight (CCR0) interrupt
             }
             TB0CCR2 += TB0CCR2_INTERVAL;      // Re-arm CCR2 for next 200ms
             break;

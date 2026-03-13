@@ -82,10 +82,6 @@ __interrupt void switch1_interrupt(void){
         TB0CCR1   = TB0R + TB0CCR1_INTERVAL;  // 5. Schedule first CCR1 event
         TB0CCTL1 |=  CCIE;                    // 6. Enable CCR1 interrupt
 
-        // Turn off backlight and halt the backlight timer during debounce
-        P6OUT    &= ~LCD_BACKLITE;            // 7.  LCD backlight OFF
-        TB0CCTL0 &= ~CCIE;                    // 8.  Disable CCR0 backlight interrupt
-
         // Project 7 SW1 actions
         switch(p7_state){
 
@@ -152,10 +148,6 @@ __interrupt void switch2_interrupt(void){
         TB0CCTL2 &= ~CCIFG;                   // 4. Clear any pending CCR2 flag
         TB0CCR2   = TB0R + TB0CCR2_INTERVAL;  // 5. Schedule first CCR2 event
         TB0CCTL2 |=  CCIE;                    // 6. Enable CCR2 interrupt
-
-        // Turn off backlight and halt the backlight timer during debounce
-        P6OUT    &= ~LCD_BACKLITE;            // 7.  LCD backlight OFF
-        TB0CCTL0 &= ~CCIE;                    // 8.  Disable CCR0 backlight interrupt
 
         // Emergency stop -- kill all motor PWM outputs immediately
         Wheels_All_Off();

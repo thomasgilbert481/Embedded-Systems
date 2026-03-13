@@ -114,6 +114,9 @@ void main(void){
     P2OUT &= ~IR_LED;
     ir_emitter_on = FALSE;
 
+    // LCD backlight ON (no blinking)
+    P6OUT |= LCD_BACKLITE;
+
     // Initial display
     strcpy(display_line[0], " Project7 ");
     strcpy(display_line[1], "  Circle  ");
