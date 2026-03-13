@@ -116,8 +116,10 @@ void Init_Ports(void){ //Init all ports
 
          P2SEL0 &= ~DAC_ENB; // DAC_ENB GPIO operation
          P2SEL1 &= ~DAC_ENB; // DAC_ENB GPIO operation
-         P2OUT |= DAC_ENB; // Initial Value = High
-         P2DIR |= DAC_ENB; // Direction = output
+         P2OUT &= ~DAC_ENB;  // Initial Value = LOW (buck-boost disabled at startup)
+         P2DIR |=  DAC_ENB;  // Direction = output
+         // DAC_ENB driven HIGH by Timer B0 overflow ISR after DAC_ENABLE_TICKS
+         // settling ticks (~1.6s). Keeping it LOW here prevents motor surge.
 
          P2SEL0 &= ~LFXOUT; // LFXOUT Clock operation
          P2SEL1 |= LFXOUT; // LFXOUT Clock operation

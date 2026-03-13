@@ -156,4 +156,5 @@ void Update_P7_Display(void);
 // NOTE: DACSREF_0 (VCC reference) -- no Init_REF() needed.
 //       Call Init_DAC() AFTER Init_Timers() (enables Timer B0 overflow for ramp).
 void Init_DAC(void);    // Configure SAC3 in 12-bit DAC buffer mode; starts ramp
-extern volatile unsigned int DAC_data;  // Current 12-bit DAC code (0-4095)
+extern volatile unsigned int DAC_data;          // Current 12-bit DAC code (0-4095)
+extern volatile unsigned int dac_startup_ticks; // Overflow ticks before DAC_ENB enables

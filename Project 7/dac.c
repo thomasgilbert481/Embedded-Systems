@@ -10,13 +10,14 @@
 //                 Lower SAC3DAT value  -->  higher buck-boost output voltage
 //                 Higher SAC3DAT value -->  lower buck-boost output voltage
 //
-//               Startup sequence:
-//                 1. Init_DAC() sets SAC3DAT = DAC_Begin (2725, ~2V -- safe)
+//               Startup sequence (per instructor guide):
+//                 1. Init_DAC() sets SAC3DAT = DAC_Begin (1500) -- safe start
 //                 2. Init_DAC() enables Timer B0 overflow interrupt (TBIE)
-//                 3. RED LED turns ON to show ramp is in progress
-//                 4. Each overflow tick (~0.52s): DAC_data -= DAC_RAMP_STEP (100)
-//                 5. When DAC_data <= DAC_Limit (850): set to DAC_Adjust (875),
-//                    disable TBIE, turn RED LED OFF
+//                 3. Phase 1 -- overflow ISR counts DAC_ENABLE_TICKS (3) ticks:
+//                    After 3 ticks (~1.6s), ISR enables DAC_ENB and RED LED ON
+//                 4. Phase 2 -- ISR decrements DAC_data by DAC_RAMP_STEP (50)
+//                    each tick until DAC_data <= DAC_Limit (1200, ~6V)
+//                 5. ISR sets DAC_Adjust, clears TBIE, turns RED LED OFF
 //                 6. Motor supply is now ~6V; PWM controls direction/speed
 //
 //               P3.5 (DAC_CNTL) is switched to analog mode via P3SELC.
@@ -34,10 +35,12 @@
 #include "ports.h"
 
 //==============================================================================
-// Global variable
+// Global variables
 //==============================================================================
-volatile unsigned int DAC_data;  // Current 12-bit DAC code (0-4095)
-                                 // Written by overflow ISR and Init_DAC
+volatile unsigned int DAC_data;          // Current 12-bit DAC code (0-4095)
+                                         // Written by overflow ISR and Init_DAC
+volatile unsigned int dac_startup_ticks; // Overflow tick counter for DAC_ENB
+                                         // settling delay (counts up to DAC_ENABLE_TICKS)
 
 //==============================================================================
 // Function: Init_DAC
@@ -115,13 +118,20 @@ void Init_DAC(void){
     SAC3DAC |= DACEN;                // Enable 12-bit DAC core
 
     // -------------------------------------------------------------------------
-    // 8. Start ramp-down sequence via Timer B0 overflow interrupt
-    //    Each overflow tick (~0.52s): DAC_data decrements by DAC_RAMP_STEP (100)
-    //    The ISR stops when DAC_data <= DAC_Limit and sets DAC_Adjust.
-    //    RED LED on = ramp in progress; off = ramp complete, motors can run.
+    // 8. Start two-phase ramp sequence via Timer B0 overflow interrupt
+    //
+    //    Phase 1 (DAC_ENABLE_TICKS ticks, ~1.6s):
+    //      dac_startup_ticks increments each overflow.  When it reaches
+    //      DAC_ENABLE_TICKS, the ISR sets P2OUT |= DAC_ENB and turns RED LED ON.
+    //
+    //    Phase 2 (ramp ticks):
+    //      Each overflow: DAC_data -= DAC_RAMP_STEP (50), until DAC_data <=
+    //      DAC_Limit.  Then DAC_Adjust is written, TBIE is cleared, RED LED OFF.
+    //
+    //    P2OUT DAC_ENB is kept LOW (disabled) by ports.c; ISR enables it.
     // -------------------------------------------------------------------------
+    dac_startup_ticks = 0;           // Reset startup counter
     TB0CTL  |= TBIE;                 // Enable Timer B0 overflow interrupt
-    P1OUT   |= RED_LED;              // RED LED ON -- ramp starting
 
 //------------------------------------------------------------------------------
 }

@@ -191,7 +191,7 @@
 // DAC Motor Power //////////////////////////////////////////////////////////////
 
 //------------------------------------------------------------------------------
-// DAC Voltage Level Constants (SAC3, DACSREF_0 = VCC reference)
+// DAC Voltage Level Constants (SAC3, DACSREF_0 = VCC/AVCC reference)
 //
 // CRITICAL: The DAC feeds the FB_DAC pin of an LT1935 Buck-Boost converter.
 //           The converter output voltage is INVERSELY proportional to the
@@ -199,18 +199,22 @@
 //             LOWER register value  -->  HIGHER output voltage to motors
 //             HIGHER register value -->  LOWER output voltage to motors
 //
-//   DAC_Begin  (2725) --> ~2.20V DAC out --> motor supply too low to spin
-//   DAC_Limit  (850)  --> ~0.68V DAC out --> ~6.08V motor supply (ramp stops)
-//   DAC_Adjust (875)  --> ~0.70V DAC out --> ~6.00V motor supply (operating pt)
-//   (Vout = n/4096 * VCC; VCC = 3.3V on FR2355 LaunchPad)
+//   Vout_dac = n/4096 * VCC  (VCC = 3.3V on FR2355 LaunchPad)
+//   DAC_Begin  (1500) --> ~1.21V DAC out --> lower motor voltage, safe start
+//   DAC_Limit  (1200) --> ~0.97V DAC out --> ~6V motor supply (ramp stops)
+//   DAC_Adjust (1200) --> ~0.97V DAC out --> ~6V motor supply (operating pt)
+//   (Per instructor: "somewhere around 1200 will be about 6V")
 //
-// The ramp runs in the Timer B0 overflow ISR: DAC_data -= 100 each ~0.52s tick
-// until DAC_data <= DAC_Limit, then it is set to DAC_Adjust and overflow stops.
+// Ramp sequence (Timer B0 overflow ISR, ~0.52s per tick):
+//   Phase 1: count DAC_ENABLE_TICKS overflows, then set P2OUT |= DAC_ENB
+//   Phase 2: decrement DAC_data by DAC_RAMP_STEP each tick until DAC_Limit
+//            When done: set DAC_Adjust, disable TBIE, turn RED LED OFF
 //------------------------------------------------------------------------------
-#define DAC_Begin   (2725)   // Safe startup: ~2.0V -- motors won't spin
-#define DAC_Limit   (850)    // Ramp stop threshold: ~6.08V motor supply
-#define DAC_Adjust  (875)    // Final operating point: ~6.00V motor supply
-#define DAC_RAMP_STEP (100)  // Decrement per Timer B0 overflow tick (~0.52s)
+#define DAC_Begin        (1500)  // Safe startup value (motors at low voltage)
+#define DAC_Limit        (1200)  // Ramp stop threshold: ~6V motor supply
+#define DAC_Adjust       (1200)  // Final operating point: ~6V motor supply
+#define DAC_RAMP_STEP    (50)    // Decrement per overflow tick (per instructor)
+#define DAC_ENABLE_TICKS (3)     // Overflow ticks before enabling DAC_ENB (~1.6s)
 
 // end of DAC Motor Power ///////////////////////////////////////////////////////
 
