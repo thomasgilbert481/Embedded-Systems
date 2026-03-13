@@ -1,32 +1,35 @@
-#define FALSE                  (0x00) //
-#define TRUE                   (0x01) //
-#define MOTOR                  (0x00) //
-#define SMCLK_OFF              (0x00) //
-#define SMCLK_ON               (0x01) //
-#define PORTS                  (0x00) // RED LED 0
-#define PWM_MODE               (0x01) // GREEN LED 1
-#define WHEEL_OFF              (0x00) // Motor stopped (0% PWM duty cycle)
-#define WHEEL_PERIOD          (10000) // Legacy -- not used for Timer B3 PWM
-#define PERCENT_80            (40004) // 40004/50005 = ~80% duty for LCD backlight
+#define FALSE                  (0x00)
+#define TRUE                   (0x01)
+#define MOTOR                  (0x00)
+#define SMCLK_OFF              (0x00)
+#define SMCLK_ON               (0x01)
+#define PORTS                  (0x00)
+#define PWM_MODE               (0x01)
+#define WHEEL_OFF              (0x00)    // Motor stopped (0% PWM duty cycle)
+#define FORWARD                (0x00)
+#define REVERSE                (0x01)
 
 //------------------------------------------------------------------------------
 // Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins
-//   P6.1 = R_FORWARD (0x02) --> TB3CCR1
-//   P6.2 = L_FORWARD (0x04) --> TB3CCR2
-//   P6.3 = R_REVERSE (0x08) --> TB3CCR3
-//   P6.4 = L_REVERSE (0x10) --> TB3CCR4
-//   P6.5 = backlight dim    --> TB3CCR5 (LCD_BACKLITE_DIMING)
+//
+//   CORRECTED mapping (per MSP430FR2355 Timer B3 TB3.x pinout):
+//     TB3.1 -> P6.1 -> R_FORWARD (0x02)
+//     TB3.2 -> P6.2 -> L_FORWARD (0x04)
+//     TB3.3 -> P6.3 -> R_REVERSE (0x08)
+//     TB3.4 -> P6.4 -> L_REVERSE (0x10)
+//
+//   PWM_PERIOD is the Timer B3 period register (TB3CCR0).
+//   WHEEL_PERIOD_VAL (50005) is the value loaded into PWM_PERIOD.
+//   PERCENT_80 (40004) is 80% of WHEEL_PERIOD_VAL.
 //------------------------------------------------------------------------------
-#define RIGHT_FORWARD_SPEED (TB3CCR1)  // P6.1 R_FORWARD
-#define LEFT_FORWARD_SPEED  (TB3CCR2)  // P6.2 L_FORWARD
-#define RIGHT_REVERSE_SPEED (TB3CCR3)  // P6.3 R_REVERSE
-#define LEFT_REVERSE_SPEED  (TB3CCR4)  // P6.4 L_REVERSE
-#define LCD_BACKLITE_DIMING (TB3CCR5)  // P6.5 LCD backlight PWM dim
+#define PWM_PERIOD            (TB3CCR0)  // Timer B3 period register
+#define RIGHT_FORWARD_SPEED   (TB3CCR1)  // P6.1 R_FORWARD
+#define LEFT_FORWARD_SPEED    (TB3CCR2)  // P6.2 L_FORWARD
+#define RIGHT_REVERSE_SPEED   (TB3CCR3)  // P6.3 R_REVERSE
+#define LEFT_REVERSE_SPEED    (TB3CCR4)  // P6.4 L_REVERSE
 
-#define STEP                   (2000)
-#define FORWARD                (0x00) // FORWARD
-#define REVERSE                (0x01) // REVERSE
-
+#define WHEEL_PERIOD_VAL      (50005)    // Timer B3 PWM period count
+#define PERCENT_80            (40004)    // 40004/50005 = ~80% duty cycle
 
 // Port 1 Pins
 #define RED_LED     (0x01) // P1.0 - Red LED
@@ -56,7 +59,7 @@
 #define SMCLK                  (0x10) // 3.4 SMCLK
 #define DAC_CNTL               (0x20) // 3.5 DAC_CNTL
 #define IOT_LINK_CPU           (0x40) // 3.6 IOT_LINK_GRN
-#define IOT_EN_CPU             (0x80) // 3.7 IOT_EN              1
+#define IOT_EN_CPU             (0x80) // 3.7 IOT_EN
 
 // Port 4 Pins
 #define RESET_LCD              (0x01) // 4.0 RESET_LCD
@@ -64,7 +67,7 @@
 #define UCA1RXD                (0x04) // 4.2 Back Channel UCA1RXD
 #define UCA1TXD                (0x08) // 4.3 Back Channel UCA1TXD
 #define UCB1_CS_LCD            (0x10) // 4.4 Chip Select
-#define UCB1CLK                (0x20) // 4.5UCB1SCK
+#define UCB1CLK                (0x20) // 4.5 UCB1SCK
 #define UCB1SIMO               (0x40) // 4.6 UCB1SIMO
 #define UCB1SOMI               (0x80) // 4.7 UCB1SOMI
 
@@ -73,13 +76,13 @@
 #define V_5                    (0x02) // 5.1 V_5_0
 #define V_DAC                  (0x04) // 5.2 V_DAC
 #define V_3_3                  (0x08) // 5.3 V_3_3
-#define IOT_BOOT_CPU           (0x10) // 5.4 IOT_BOOT           1
+#define IOT_BOOT_CPU           (0x10) // 5.4 IOT_BOOT
 
 // Port 6 Pins
-#define LCD_BACKLITE           (0x01) // 6.0 LCD_BACKLITE (GPIO toggle)
+#define LCD_BACKLITE           (0x01) // 6.0 LCD_BACKLITE
 #define R_FORWARD              (0x02) // 6.1 Right Forward  --> TB3CCR1 PWM
 #define L_FORWARD              (0x04) // 6.2 Left Forward   --> TB3CCR2 PWM
 #define R_REVERSE              (0x08) // 6.3 Right Reverse  --> TB3CCR3 PWM
 #define L_REVERSE              (0x10) // 6.4 Left Reverse   --> TB3CCR4 PWM
-#define P6_5                   (0x20) // 6.5 (unused GPIO / optional TB3CCR5)
+#define P6_5                   (0x20) // 6.5 (unused)
 #define GRN_LED                (0x40) // 6.6 GREEN LED

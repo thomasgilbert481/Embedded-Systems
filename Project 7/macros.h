@@ -1,8 +1,11 @@
 //==============================================================================
 // File Name: macros.h
-// Description: Contains all #define macros for the project
+// Description: Contains all #define macros for Project 7 (Circle Following).
+//              Includes all Project 5/6 defines for compatibility, plus all
+//              Project 7 state machine, timing, PD control, DAC, and speed
+//              defines.
 // Author: Thomas Gilbert
-// Date: Feb 2026
+// Date: Mar 2026
 // Compiler: Code Composer Studio
 //==============================================================================
 
@@ -11,29 +14,18 @@
 
 #define ALWAYS                  (1)
 #define RESET_STATE             (0)
-#define RED_LED              (0x01) // RED LED 0
-#define GRN_LED              (0x40) // GREEN LED 1
-#define TEST_PROBE           (0x01) // 0 TEST PROBE
-#define TRUE                 (0x01) //
+#define RED_LED              (0x01)
+#define GRN_LED              (0x40)
+#define TEST_PROBE           (0x01)
+#define TRUE                 (0x01)
+#define FALSE                (0x00)
 
 // Project 5 additions /////////////////////////////////////////////////////////
 
-// Timer B0 CCR0 interval -- HW06: continuous mode, ID__8, TBIDEX__8 = 125kHz
-// 8,000,000 / 8 / 8 / (1 / 0.200) = 25,000 counts = 200ms per interrupt
-// 5 interrupts = 1 second
-#define TB0CCR0_INTERVAL     (25000)  // 200ms: 8MHz/8/8/(1/0.2) = 25,000
-
-// Timer B0 CCR1/CCR2 intervals for interrupt-driven switch debounce
-// Same divider chain as CCR0 => same 200ms per interrupt
-#define TB0CCR1_INTERVAL     (25000)  // 200ms base for SW1 debounce
-#define TB0CCR2_INTERVAL     (25000)  // 200ms base for SW2 debounce
-
-// Debounce threshold: number of CCR1/CCR2 interrupts before re-enabling switch
-// 5 x 200ms = 1.0 second total debounce period
-#define DEBOUNCE_THRESHOLD   (5)      // 5 x 200ms = 1 second
-
-// Time_Sequence wrap value (250 x 200ms = 50 seconds)
-#define TIME_SEQ_MAX         (250)
+// Timer B0 CCR0 interval
+// SMCLK = 8 MHz, so 40000 counts = 5ms per interrupt
+// 200 interrupts = 1 second
+#define TB0CCR0_INTERVAL     (40000)
 
 // Movement sequence step numbers
 #define P5_FWD1              (1)
@@ -48,174 +40,138 @@
 #define P5_PAUSE5            (10)
 #define P5_DONE              (11)
 
-// Timing constants (based on 200ms per ISR tick -- HW06 CCR0 interval)
-#define ONE_SEC              (5)     // 5 x 200ms = 1.0 second
-#define TWO_SEC              (10)    // 10 x 200ms = 2.0 seconds
-#define THREE_SEC            (15)    // 15 x 200ms = 3.0 seconds
+// Timing constants (5ms per ISR tick)
+#define ONE_SEC              (200)   // 200 * 5ms = 1.0 second
+#define TWO_SEC              (400)   // 400 * 5ms = 2.0 seconds
+#define THREE_SEC            (600)   // 600 * 5ms = 3.0 seconds
 
 // end of Project 5 additions //////////////////////////////////////////////////
 
 // Project 6 additions /////////////////////////////////////////////////////////
 
 //------------------------------------------------------------------------------
-// ADC Channel Sequence Indices (used in ADC_ISR switch to track which channel
-// was just converted -- these index into the adc_channel counter, NOT the
-// hardware channel numbers)
+// ADC Channel Sequence Indices
 //------------------------------------------------------------------------------
-#define ADC_CHANNEL_SEQ_LEFT     (0)  // adc_channel value when A2 just finished
-#define ADC_CHANNEL_SEQ_RIGHT    (1)  // adc_channel value when A3 just finished
-#define ADC_CHANNEL_SEQ_THUMB    (2)  // adc_channel value when A5 just finished
+#define ADC_CHANNEL_SEQ_LEFT     (0)
+#define ADC_CHANNEL_SEQ_RIGHT    (1)
+#define ADC_CHANNEL_SEQ_THUMB    (2)
 
 //------------------------------------------------------------------------------
-// Black line detection threshold -- TUNE ON YOUR HARDWARE
-//   IR behavior (emitter ON):
-//     White surface -> more reflected IR -> phototransistor pulls voltage DOWN
-//                    -> lower ADC reading
-//     Black surface -> less reflected IR -> voltage stays HIGH
-//                    -> higher ADC reading
-//   Set threshold midway between your white and black readings.
-//   Example: white ~0x0100, black ~0x0500 -> threshold ~0x0300
+// Black line detection threshold (kept for P6 compatibility)
 //------------------------------------------------------------------------------
-#define BLACK_LINE_THRESHOLD     (0x0300)  // Adjust after hardware calibration
+#define BLACK_LINE_THRESHOLD     (0x0300)
 
 //------------------------------------------------------------------------------
-// Project 6 State Machine -- Black Line Detection Sequence
+// Project 6 State Machine
 //------------------------------------------------------------------------------
-#define P6_IDLE            (0)  // Waiting for SW1 press
-#define P6_WAIT_1SEC       (1)  // 1-second delay before moving (fingers clear)
-#define P6_FORWARD         (2)  // Driving forward, monitoring ADC for black line
-#define P6_DETECTED_STOP   (3)  // Stopped -- showing "Black Line / Detected"
-#define P6_TURNING         (4)  // Turning to align detectors over the line
-#define P6_ALIGNED         (5)  // Aligned -- displaying live black line ADC values
+#define P6_IDLE            (0)
+#define P6_WAIT_1SEC       (1)
+#define P6_FORWARD         (2)
+#define P6_DETECTED_STOP   (3)
+#define P6_TURNING         (4)
+#define P6_ALIGNED         (5)
 
 //------------------------------------------------------------------------------
-// Project 6 Timing Constants (200ms per ISR tick, 5 ticks = 1 second)
+// Project 6 Timing Constants (5ms per ISR tick)
 //------------------------------------------------------------------------------
-#define DETECT_DELAY_1SEC  (5)     // 5 x 200ms = 1.0 second
-#define DETECT_STOP_TIME   (15)    // 15 x 200ms = 3.0 seconds
-#define TURN_TIME          (2)     // 2 x 200ms = 0.4 second (adjust by testing)
+#define DETECT_DELAY_1SEC  (200)   // 200 * 5ms = 1.0 second
+#define DETECT_STOP_TIME   (600)   // 600 * 5ms = 3.0 seconds
+#define TURN_TIME          (200)   // 200 * 5ms = 1.0 second
+
+//------------------------------------------------------------------------------
+// Software PWM (P6 -- kept for reference)
+//------------------------------------------------------------------------------
+#define MOTOR_PWM_PERIOD   (10)
+#define MOTOR_DUTY_CYCLE   (5)
 
 // end of Project 6 additions //////////////////////////////////////////////////
 
-// Project 7 additions /////////////////////////////////////////////////////////
+// ===== Project 7 additions ===================================================
 
 //------------------------------------------------------------------------------
-// Project 7 State Machine States
+// State Machine States
 //------------------------------------------------------------------------------
-#define P7_IDLE              (0)  // Waiting for SW1
-#define P7_CALIBRATE         (1)  // Three-phase calibration: ambient, white, black
-#define P7_WAIT_START        (2)  // Wait for SW1 press to reposition car before start
-#define P7_FORWARD           (3)  // Drive forward from circle center toward black line
-#define P7_DETECTED_STOP     (4)  // Brief stop on line detection (~1 sec) to confirm
-#define P7_TURNING           (5)  // Rotate to align both detectors over the line
-#define P7_FOLLOW_LINE       (6)  // PID line following -- core following state
-#define P7_EXIT_TURN         (7)  // After 2 laps, turn into circle center
-#define P7_DONE              (8)  // Stopped inside circle; timer frozen
-#define P7_ARMED             (9)  // Calibration done; waiting 2s then start forward
+#define P7_IDLE              (0)   // Waiting for SW1. Show live ADC. IR OFF.
+#define P7_CALIBRATE         (1)   // Multi-phase: ambient -> white -> black
+#define P7_CAL_COMPLETE      (2)   // Cal done. User repositions. Press SW1.
+#define P7_WAIT_START        (3)   // 2-sec delay after SW1 before driving
+#define P7_FORWARD           (4)   // Drive forward toward black line
+#define P7_DETECTED_STOP     (5)   // Briefly stop on line detection (~1 sec)
+#define P7_TURNING           (6)   // Rotate to align both detectors
+#define P7_FOLLOW_LINE       (7)   // PD line following for two laps
+#define P7_EXIT_TURN         (8)   // After 2 laps, spin toward circle center
+#define P7_EXIT_FORWARD      (9)   // Drive briefly into center
+#define P7_DONE              (10)  // Stopped. Timer frozen.
 
 //------------------------------------------------------------------------------
-// Calibration sub-phases (used within P7_CALIBRATE)
+// Calibration sub-phases
 //------------------------------------------------------------------------------
-#define CAL_AMBIENT          (0)  // Emitter OFF: sample ambient light
-#define CAL_WHITE            (1)  // Emitter ON: sample white surface
-#define CAL_WAIT_BLACK       (2)  // Waiting for SW1 press to place on black tape
-#define CAL_BLACK            (3)  // Sample black line readings
-#define CAL_DONE             (4)  // Calibration complete
+#define CAL_AMBIENT          (0)   // IR OFF: sample ambient
+#define CAL_WHITE            (1)   // IR ON: sample white surface
+#define CAL_WAIT_BLACK       (2)   // Waiting for SW1 to place on black tape
+#define CAL_BLACK            (3)   // Sample black tape, compute thresholds
+#define CAL_DONE             (4)   // Calibration complete
 
 //------------------------------------------------------------------------------
-// Calibration timing (in 200ms ISR ticks; ONE_SEC = 5 ticks)
+// Calibration timing (5ms ISR ticks)
 //------------------------------------------------------------------------------
-#define CAL_SAMPLE_DELAY     (5)   // 5 x 200ms = 1 second wait before sampling
+#define CAL_SAMPLE_DELAY     (200)   // 200 * 5ms = 1 second
 
 //------------------------------------------------------------------------------
-// Line following speeds (for hardware PWM via Timer B3)
-//   WHEEL_PERIOD_VAL is the Timer B3 CCR0 period (50005 cycles at 8 MHz SMCLK)
-//   Duty cycle = speed value / WHEEL_PERIOD_VAL
-//   WHEEL_OFF = 0 (0% duty cycle -- motor stopped)
-//   Must be less than WHEEL_PERIOD_VAL.
-//   NEVER set a forward AND reverse CCR to nonzero simultaneously.
+// DAC Motor Voltage Control
 //------------------------------------------------------------------------------
-#define WHEEL_PERIOD_VAL     (50005) // Timer B3 PWM period (~160 Hz at 8 MHz)
-#define FOLLOW_FAST          (35000) // ~70% duty -- straight-ahead burst speed
-#define FOLLOW_SPEED         (25000) // ~50% duty -- normal following speed
-#define FOLLOW_SLOW          (20000) // ~40% duty -- inner-wheel correction (TUNED: was 12000)
-#define FOLLOW_SEARCH        (25000) // ~50% duty -- both-off search/recovery (TUNED: was 15000)
-#define SPIN_SPEED           (25000) // ~50% duty -- spin turns and alignment
+#define DAC_INITIAL_VALUE    (1500)  // Safe startup (low motor voltage)
+#define DAC_TARGET_VALUE     (1200)  // Target (~6V motor supply -- TUNE THIS)
+#define DAC_RAMP_STEP        (50)    // Subtract from DAC_data per timer tick
+#define DAC_ENB_DELAY        (3)     // ISR ticks before enabling DAC_ENB
 
 //------------------------------------------------------------------------------
-// PID line following constants
-//   FOLLOW_BASE: base speed applied to both wheels (0% correction = straight)
-//   FOLLOW_KP:   proportional gain; correction = FOLLOW_KP * error
-//                error range: [-100, 100], so max correction = FOLLOW_KP * 100
-//                TUNE FOLLOW_KP on hardware (start low ~100, increase if sluggish)
+// PD Line Following Control (TUNE ALL ON HARDWARE)
+//   Raw correction = (Kp * error) + (Kd * delta_error)
+//   Divided by PD_SCALE_DIVISOR to fit PWM range.
+//   Start with Kp=1, Kd=5, divisor=10 and adjust on hardware.
 //------------------------------------------------------------------------------
-#define FOLLOW_BASE          (25000) // Base PWM: ~50% duty
-#define FOLLOW_KP            (100)   // Proportional gain (TUNE ON HARDWARE)
-// Maximum PWM output for PID clamp.
-// MUST be < 32768 (fits in signed 16-bit int) AND < WHEEL_PERIOD_VAL (50005).
-// Writing CCRx = WHEEL_PERIOD_VAL = CCR0 with OUTMOD_7 gives 0% duty -- avoid!
-#define FOLLOW_MAX_PWM       (32000) // Safe PID output ceiling (fits in int)
+#define KP_VALUE             (1)
+#define KD_VALUE             (5)
+#define PD_SCALE_DIVISOR     (10)
 
 //------------------------------------------------------------------------------
-// Wait / delay times (in 200ms ISR ticks; ONE_SEC = 5 ticks)
+// Motor speeds (Timer B3 PWM -- must be < WHEEL_PERIOD_VAL = 50005)
 //------------------------------------------------------------------------------
-#define P7_WAIT_START_TIME   (10)    // 10 x 200ms = 2-second operator step-back delay
-#define P7_DETECT_STOP_TIME  (5)     // 5 x 200ms = 1-second pause after line detection
-#define P7_INITIAL_TURN_TIME (5)     // 5 x 200ms = 1-second alignment spin (TUNE THIS)
+#define WHEEL_PERIOD_VAL     (50005) // Timer B3 period count (~160 Hz at 8 MHz)
+#define BASE_FOLLOW_SPEED    (20000) // Nominal PD following speed
+#define MAX_FOLLOW_SPEED     (35000) // Max speed after PD correction
+#define FOLLOW_SPEED         (25000) // Default forward/reverse speed
+#define SPIN_SPEED           (20000) // Speed for spin turns
+#define REVERSE_SPEED        (15000) // Reverse when line lost
+#define PERCENT_80           (40004) // 80% of WHEEL_PERIOD_VAL
 
 //------------------------------------------------------------------------------
-// Line-following lap timing
-//   All in units of elapsed_tenths (0.2-second increments).
-//   Each CCR0 ISR tick = 200ms = 0.2s, so 1 elapsed_tenth = 1 tick.
-//   ONE_LAP_TIME_TENTHS: approximate time for one lap (TUNE ON HARDWARE)
-//   TWO_LAP_TIME_TENTHS: total for two laps before exit
+// Wait/delay times (5ms ticks)
 //------------------------------------------------------------------------------
-#define ONE_LAP_TIME_TENTHS  (100)   // 100 x 0.2s = 20 seconds per lap (TUNE THIS)
-#define TWO_LAP_TIME_TENTHS  (200)   // 200 x 0.2s = 40 seconds for 2 laps (TUNE THIS)
+#define P7_WAIT_START_TIME   (400)   // 400 * 5ms = 2 sec before driving
+#define P7_DETECT_STOP_TIME  (200)   // 200 * 5ms = 1 sec on detection
+#define P7_INITIAL_TURN_TIME (200)   // 200 * 5ms = 1 sec alignment (TUNE)
 
 //------------------------------------------------------------------------------
-// Exit maneuver timing (in 200ms ISR ticks)
+// Lap timing (0.2s "tenths" units; 1 tenth = 0.2 seconds)
 //------------------------------------------------------------------------------
-#define EXIT_TURN_TIME       (8)     // 8 x 200ms = 1.6-second spin into center (TUNE)
-#define EXIT_FORWARD_TIME    (5)     // 5 x 200ms = 1-second drive into center (TUNE)
+#define ONE_LAP_TIME_TENTHS  (100)   // ~20 sec per lap (TUNE on hardware)
+#define TWO_LAP_TIME_TENTHS  (200)   // ~40 sec for 2 laps (TUNE on hardware)
 
 //------------------------------------------------------------------------------
-// 0.2-second display timer
-//   Timer B0 CCR0 fires every 200ms.  Each ISR tick IS one 0.2-second increment.
-//   DISPLAY_TIMER_TICKS = 1 means elapsed_tenths increments on every ISR tick.
+// Exit maneuver (5ms ticks)
 //------------------------------------------------------------------------------
-#define DISPLAY_TIMER_TICKS  (1)     // Each 200ms ISR tick = 1 elapsed_tenth (0.2s)
-
-// end of Project 7 additions //////////////////////////////////////////////////
-
-// DAC Motor Power //////////////////////////////////////////////////////////////
+#define EXIT_TURN_TIME       (300)   // 300 * 5ms = 1.5 sec spin (TUNE)
+#define EXIT_FORWARD_TIME    (200)   // 200 * 5ms = 1 sec drive in (TUNE)
 
 //------------------------------------------------------------------------------
-// DAC Voltage Level Constants (SAC3, DACSREF_0 = VCC/AVCC reference)
-//
-// CRITICAL: The DAC feeds the FB_DAC pin of an LT1935 Buck-Boost converter.
-//           The converter output voltage is INVERSELY proportional to the
-//           DAC feedback voltage.
-//             LOWER register value  -->  HIGHER output voltage to motors
-//             HIGHER register value -->  LOWER output voltage to motors
-//
-//   Vout_dac = n/4096 * VCC  (VCC = 3.3V on FR2355 LaunchPad)
-//   DAC_Begin  (1500) --> ~1.21V DAC out --> lower motor voltage, safe start
-//   DAC_Limit  (1200) --> ~0.97V DAC out --> ~6V motor supply (ramp stops)
-//   DAC_Adjust (1200) --> ~0.97V DAC out --> ~6V motor supply (operating pt)
-//   (Per instructor: "somewhere around 1200 will be about 6V")
-//
-// Ramp sequence (Timer B0 overflow ISR, ~0.52s per tick):
-//   Phase 1: count DAC_ENABLE_TICKS overflows, then set P2OUT |= DAC_ENB
-//   Phase 2: decrement DAC_data by DAC_RAMP_STEP each tick until DAC_Limit
-//            When done: set DAC_Adjust, disable TBIE, turn RED LED OFF
+// Display timer
+//   DISPLAY_TIMER_TICKS: how many 5ms ISR ticks = one 0.2-second elapsed_tenth
+//   40 ticks * 5ms = 200ms = 0.2s
 //------------------------------------------------------------------------------
-#define DAC_Begin        (1500)  // Safe startup value (motors at low voltage)
-#define DAC_Limit        (1200)  // Ramp stop threshold: ~6V motor supply
-#define DAC_Adjust       (1200)  // Final operating point: ~6V motor supply
-#define DAC_RAMP_STEP    (50)    // Decrement per overflow tick (per instructor)
-#define DAC_ENABLE_TICKS (3)     // Overflow ticks before enabling DAC_ENB (~1.6s)
+#define DISPLAY_TIMER_TICKS  (40)    // 40 * 5ms = 200ms per elapsed_tenth
 
-// end of DAC Motor Power ///////////////////////////////////////////////////////
+// ===== end of Project 7 additions ============================================
 
 #endif /* MACROS_H_ */

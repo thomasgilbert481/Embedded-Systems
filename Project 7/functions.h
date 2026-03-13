@@ -1,12 +1,10 @@
 //******************************************************************************
 //
-//  Description: This file contains the Function prototypes
+//  Description: Function prototypes for Project 7 -- Circle Following Robot.
 //
-//  Jim Carlson
-//  Aug 2013
-//  Built with IAR Embedded Workbench Version: V4.10A/W32 (5.40.1)
+//  Jim Carlson (base), Thomas Gilbert (P7 additions)
+//  Mar 2026
 //******************************************************************************
-// Functions
 
 // Main
 void main(void);
@@ -16,20 +14,11 @@ void Init_Conditions(void);
 
 // Interrupts
 void enable_interrupts(void);
-
-// Timer B0 ISRs (interrupts_timers.c)
-__interrupt void Timer0_B0_ISR(void);   // CCR0: 200ms backlight + display update
-__interrupt void TIMER0_B1_ISR(void);   // CCR1/CCR2: SW1/SW2 debounce timers
-
-// Port ISRs (interrupt_ports.c)
-__interrupt void switch1_interrupt(void); // PORT4_VECTOR: SW1 press (P4.1)
-__interrupt void switch2_interrupt(void); // PORT2_VECTOR: SW2 press (P2.3)
-
-// Debounce counters (defined in interrupts_timers.c)
-extern volatile unsigned int sw1_debounce_count;
-extern volatile unsigned int sw2_debounce_count;
+__interrupt void Timer0_B0_ISR(void);
 
 // Analog to Digital Converter
+void Init_ADC(void);
+void HexToBCD(int hex_value);
 
 // Clocks
 void Init_Clocks(void);
@@ -39,9 +28,9 @@ void Init_LEDs(void);
 void IR_LED_control(char selection);
 void Backlite_control(char selection);
 
-  // LCD
+// LCD
 void Display_Process(void);
-void Display_Update(char p_L1,char p_L2,char p_L3,char p_L4);
+void Display_Update(char p_L1, char p_L2, char p_L3, char p_L4);
 void enable_display_update(void);
 void update_string(char *string_data, int string);
 void Init_LCD(void);
@@ -76,7 +65,7 @@ void lcd_rotate(char view);
 void lcd_write(unsigned char c);
 void lcd_write_line3(void);
 
-void lcd_command( char data);
+void lcd_command(char data);
 void LCD_test(void);
 void LCD_iot_meassage_print(int nema_index);
 
@@ -123,14 +112,13 @@ void Init_Timers(void);
 void Init_Timer_B0(void);
 void Init_Timer_B1(void);
 void Init_Timer_B2(void);
-void Init_Timer_B3(void);        // Hardware PWM for motor control (Project 7)
+void Init_Timer_B3(void);
 
 void usleep(unsigned int usec);
 void usleep10(unsigned int usec);
 void five_msec_sleep(unsigned int msec);
 void measure_delay(void);
 void out_control_words(void);
-
 
 // Wheel control functions (Projects 5-7)
 void Wheels_All_Off(void);
@@ -140,21 +128,16 @@ void Reverse_On(void);
 void Reverse_Off(void);
 void Spin_CW_On(void);
 void Spin_CCW_On(void);
-
-// ADC functions (Project 6)
-void Init_ADC(void);
-void HexToBCD(int hex_value);
+void Run_Project5(void);
 
 // Project 6 state machine
 void Run_Project6(void);
 
-// Project 7 state machine and display
+// Project 7 state machine and control
 void Run_Project7(void);
 void Update_P7_Display(void);
+void Follow_Line(void);
 
 // DAC Motor Power (dac.c)
-// NOTE: DACSREF_0 (VCC reference) -- no Init_REF() needed.
-//       Call Init_DAC() AFTER Init_Timers() (enables Timer B0 overflow for ramp).
-void Init_DAC(void);    // Configure SAC3 in 12-bit DAC buffer mode; starts ramp
-extern volatile unsigned int DAC_data;          // Current 12-bit DAC code (0-4095)
-extern volatile unsigned int dac_startup_ticks; // Overflow ticks before DAC_ENB enables
+void Init_DAC(void);
+extern unsigned int DAC_data;            // Current 12-bit DAC code (defined in dac.c)
