@@ -104,13 +104,14 @@
 //------------------------------------------------------------------------------
 #define P7_IDLE              (0)  // Waiting for SW1
 #define P7_CALIBRATE         (1)  // Three-phase calibration: ambient, white, black
-#define P7_WAIT_START        (2)  // Brief delay (~2 sec) for operator to step back
+#define P7_WAIT_START        (2)  // Wait for SW1 press to reposition car before start
 #define P7_FORWARD           (3)  // Drive forward from circle center toward black line
 #define P7_DETECTED_STOP     (4)  // Brief stop on line detection (~1 sec) to confirm
 #define P7_TURNING           (5)  // Rotate to align both detectors over the line
-#define P7_FOLLOW_LINE       (6)  // Bang-bang line following -- core following state
+#define P7_FOLLOW_LINE       (6)  // PID line following -- core following state
 #define P7_EXIT_TURN         (7)  // After 2 laps, turn into circle center
 #define P7_DONE              (8)  // Stopped inside circle; timer frozen
+#define P7_ARMED             (9)  // Calibration done; waiting 2s then start forward
 
 //------------------------------------------------------------------------------
 // Calibration sub-phases (used within P7_CALIBRATE)
@@ -135,11 +136,22 @@
 //   NEVER set a forward AND reverse CCR to nonzero simultaneously.
 //------------------------------------------------------------------------------
 #define WHEEL_PERIOD_VAL     (50005) // Timer B3 PWM period (~160 Hz at 8 MHz)
+#define WHEEL_OFF            (0)     // 0% duty -- motor stopped
 #define FOLLOW_FAST          (35000) // ~70% duty -- straight-ahead burst speed
 #define FOLLOW_SPEED         (25000) // ~50% duty -- normal following speed
 #define FOLLOW_SLOW          (20000) // ~40% duty -- inner-wheel correction (TUNED: was 12000)
 #define FOLLOW_SEARCH        (25000) // ~50% duty -- both-off search/recovery (TUNED: was 15000)
 #define SPIN_SPEED           (25000) // ~50% duty -- spin turns and alignment
+
+//------------------------------------------------------------------------------
+// PID line following constants
+//   FOLLOW_BASE: base speed applied to both wheels (0% correction = straight)
+//   FOLLOW_KP:   proportional gain; correction = FOLLOW_KP * error
+//                error range: [-100, 100], so max correction = FOLLOW_KP * 100
+//                TUNE FOLLOW_KP on hardware (start low ~100, increase if sluggish)
+//------------------------------------------------------------------------------
+#define FOLLOW_BASE          (25000) // Base PWM: ~50% duty
+#define FOLLOW_KP            (100)   // Proportional gain (TUNE ON HARDWARE)
 
 //------------------------------------------------------------------------------
 // Wait / delay times (in 200ms ISR ticks; ONE_SEC = 5 ticks)

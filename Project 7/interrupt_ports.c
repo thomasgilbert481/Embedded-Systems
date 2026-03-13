@@ -8,6 +8,7 @@
 //               SW1 behavior (Project 7):
 //                 - P7_IDLE:          Start calibration sequence
 //                 - P7_CALIBRATE with CAL_WAIT_BLACK: Advance to black sample
+//                 - P7_WAIT_START:    Arm car (start 2-second countdown)
 //                 - All other states: Ignored
 //
 //               SW2 behavior (Project 7):
@@ -65,6 +66,7 @@ extern unsigned int           calibrate_phase;
 // Globals used:    p7_state, calibrate_phase
 // Globals changed: sw1_debounce_count, p7_state, p7_timer, p7_running,
 //                  calibrate_phase, display_line, display_changed
+// States handled:  P7_IDLE, P7_CALIBRATE (CAL_WAIT_BLACK), P7_WAIT_START
 // Local variables: none
 //==============================================================================
 #pragma vector = PORT4_VECTOR
@@ -106,6 +108,14 @@ __interrupt void switch1_interrupt(void){
                     calibrate_phase = CAL_BLACK;
                     // Display updated in Run_Project7 CAL_BLACK case
                 }
+                break;
+
+            case P7_WAIT_START:
+                // Operator has repositioned car; start 2-second armed countdown
+                p7_timer = RESET_STATE;
+                p7_state = P7_ARMED;
+                // Display set on first entry of P7_ARMED case in Run_Project7
+                display_changed = TRUE;
                 break;
 
             default:
