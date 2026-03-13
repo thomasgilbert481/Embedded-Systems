@@ -151,6 +151,10 @@
 //------------------------------------------------------------------------------
 #define FOLLOW_BASE          (25000) // Base PWM: ~50% duty
 #define FOLLOW_KP            (100)   // Proportional gain (TUNE ON HARDWARE)
+// Maximum PWM output for PID clamp.
+// MUST be < 32768 (fits in signed 16-bit int) AND < WHEEL_PERIOD_VAL (50005).
+// Writing CCRx = WHEEL_PERIOD_VAL = CCR0 with OUTMOD_7 gives 0% duty -- avoid!
+#define FOLLOW_MAX_PWM       (32000) // Safe PID output ceiling (fits in int)
 
 //------------------------------------------------------------------------------
 // Wait / delay times (in 200ms ISR ticks; ONE_SEC = 5 ticks)

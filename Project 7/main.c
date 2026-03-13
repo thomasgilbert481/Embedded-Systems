@@ -455,10 +455,13 @@ void Run_Project7(void){
 
     //--------------------------------------------------------------------------
     // FORWARD: Drive forward until either IR detector sees the black line.
+    //   Guard: ignore detection for first 3 ticks (0.6s) to let car start
+    //   moving and avoid false triggers from residual ADC values.
     //--------------------------------------------------------------------------
     case P7_FORWARD:
-        if((ADC_Left_Detect  > threshold_left) ||
-           (ADC_Right_Detect > threshold_right)){
+        if(p7_timer >= 3 &&
+           ((ADC_Left_Detect  > threshold_left) ||
+            (ADC_Right_Detect > threshold_right))){
 
             Wheels_All_Off();   // Stop immediately (H-bridge safe)
 
@@ -582,11 +585,15 @@ void Run_Project7(void){
         left_speed  = (int)FOLLOW_BASE + correction;
         right_speed = (int)FOLLOW_BASE - correction;
 
-        // Clamp to valid PWM range
-        if(left_speed  < (int)WHEEL_OFF)         left_speed  = (int)WHEEL_OFF;
-        if(right_speed < (int)WHEEL_OFF)         right_speed = (int)WHEEL_OFF;
-        if(left_speed  > (int)WHEEL_PERIOD_VAL)  left_speed  = (int)WHEEL_PERIOD_VAL;
-        if(right_speed > (int)WHEEL_PERIOD_VAL)  right_speed = (int)WHEEL_PERIOD_VAL;
+        // Clamp to valid PWM range.
+        // IMPORTANT: WHEEL_PERIOD_VAL = 50005 overflows a signed 16-bit int
+        // (-15531), so never cast it to int for comparison. Use FOLLOW_MAX_PWM
+        // (32000) as the ceiling -- it fits safely in int and is below CCR0,
+        // avoiding the OUTMOD_7 edge case where CCRx = CCR0 = 0% duty.
+        if(left_speed  < 0)                      left_speed  = 0;
+        if(right_speed < 0)                      right_speed = 0;
+        if(left_speed  > (int)FOLLOW_MAX_PWM)    left_speed  = (int)FOLLOW_MAX_PWM;
+        if(right_speed > (int)FOLLOW_MAX_PWM)    right_speed = (int)FOLLOW_MAX_PWM;
 
         // Write PWM -- ensure reverse is always off (H-bridge safety)
         LEFT_REVERSE_SPEED  = WHEEL_OFF;
