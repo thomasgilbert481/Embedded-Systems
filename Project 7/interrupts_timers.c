@@ -45,6 +45,10 @@ extern volatile unsigned int p7_running;        // TRUE = ISR increments p7_time
 extern volatile unsigned int elapsed_tenths;    // 0.2-second display counter
 extern volatile unsigned int p7_timer_running;  // TRUE = ISR increments elapsed_tenths
 
+// From dac.c (DAC motor power ramp)
+extern volatile unsigned int DAC_data;          // Current 12-bit DAC code
+extern volatile unsigned int dac_startup_ticks; // Overflow tick counter for settling delay
+
 //==============================================================================
 // ISR: Timer0_B0_ISR
 // Description:  Timer B0 CCR0 interrupt -- fires every 200ms.
@@ -67,9 +71,6 @@ extern volatile unsigned int p7_timer_running;  // TRUE = ISR increments elapsed
 #pragma vector = TIMER0_B0_VECTOR
 __interrupt void Timer0_B0_ISR(void){
 //------------------------------------------------------------------------------
-
-    // Toggle LCD backlight (creates 2.5 Hz blink -- 200ms on, 200ms off)
-    P6OUT ^= LCD_BACKLITE;
 
     // Signal the main loop that it is time to refresh the display
     update_display = TRUE;
@@ -142,7 +143,6 @@ __interrupt void TIMER0_B1_ISR(void){
                 TB0CCTL1  &= ~CCIE;           // Disable CCR1 interrupt
                 P4IFG     &= ~SW1;            // Clear any pending SW1 flag
                 P4IE      |=  SW1;            // Re-enable SW1 port interrupt
-                TB0CCTL0  |=  CCIE;           // Re-enable backlight (CCR0) interrupt
             }
             TB0CCR1 += TB0CCR1_INTERVAL;      // Re-arm CCR1 for next 200ms
             break;
@@ -153,12 +153,40 @@ __interrupt void TIMER0_B1_ISR(void){
                 TB0CCTL2  &= ~CCIE;           // Disable CCR2 interrupt
                 P2IFG     &= ~SW2;            // Clear any pending SW2 flag
                 P2IE      |=  SW2;            // Re-enable SW2 port interrupt
-                TB0CCTL0  |=  CCIE;           // Re-enable backlight (CCR0) interrupt
             }
             TB0CCR2 += TB0CCR2_INTERVAL;      // Re-arm CCR2 for next 200ms
             break;
 
-        case 14:                              // Timer overflow -- not used
+        case 14:                              // Timer overflow -- DAC enable + ramp
+            // Phase 1: wait DAC_ENABLE_TICKS overflows before enabling buck-boost.
+            //   This lets the DAC output settle before the LT1935 sees it.
+            //   After DAC_ENABLE_TICKS ticks: set P2OUT |= DAC_ENB, RED LED ON.
+            //
+            // Phase 2: decrement DAC_data by DAC_RAMP_STEP each tick.
+            //   Lower DAC value = higher motor supply voltage (inverted).
+            //   Stop when DAC_data <= DAC_Limit: set DAC_Adjust, clear TBIE.
+            if(!(P2OUT & DAC_ENB)){
+                // Phase 1 -- settling delay
+                dac_startup_ticks++;
+                if(dac_startup_ticks >= DAC_ENABLE_TICKS){
+                    P2OUT |= DAC_ENB;         // Enable buck-boost converter
+                    P1OUT |= RED_LED;         // RED LED ON -- ramp starting
+                }
+            } else {
+                // Phase 2 -- ramp down toward motor operating voltage
+                if(DAC_data >= (DAC_Limit + DAC_RAMP_STEP)){
+                    DAC_data -= DAC_RAMP_STEP; // Increment motor voltage
+                } else {
+                    DAC_data = DAC_Adjust;     // Clamp to exact operating point
+                }
+                SAC3DAT = DAC_data;            // Update hardware DAC register
+                if(DAC_data <= DAC_Limit){     // Ramp complete?
+                    DAC_data = DAC_Adjust;     // Lock to operating point
+                    SAC3DAT  = DAC_data;
+                    TB0CTL  &= ~TBIE;          // Disable overflow interrupt
+                    P1OUT   &= ~RED_LED;       // RED LED OFF -- ramp done
+                }
+            }
             break;
 
         default:

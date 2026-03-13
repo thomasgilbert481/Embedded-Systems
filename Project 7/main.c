@@ -7,7 +7,8 @@
 //                1. P7_IDLE       -- Wait for SW1. Display live ADC values.
 //                2. P7_CALIBRATE  -- Three-phase calibration:
 //                                    Ambient (emitter off), White, Black.
-//                3. P7_WAIT_START -- 2-second operator step-back delay.
+//                3. P7_WAIT_START -- Wait for SW1 to reposition car.
+//                   P7_ARMED     -- 2-second countdown, then drive forward.
 //                4. P7_FORWARD    -- Drive forward until black line detected.
 //                5. P7_DETECTED_STOP -- Pause 1 sec on line.
 //                6. P7_TURNING    -- Align both detectors over the line.
@@ -53,13 +54,6 @@ extern volatile unsigned char display_changed;  // Flag: LCD content updated
 extern volatile unsigned char update_display;   // Flag: timer says refresh LCD
 extern volatile unsigned int Time_Sequence;     // Master timer counter from ISR
 extern volatile char one_time;                  // One-time execution flag
-
-// Project 5 timing (kept for compatibility)
-volatile unsigned int p5_timer   = RESET_STATE;
-volatile unsigned int p5_running = FALSE;
-unsigned int p5_step    = RESET_STATE;
-char p5_started = FALSE;
-char step_init  = TRUE;
 
 //------------------------------------------------------------------------------
 // Project 7 state machine variables (defined here, extern'd in other files)
@@ -107,12 +101,20 @@ void main(void){
     Init_LCD();             // Initialize LCD display (SPI)
     Init_ADC();             // Initialize 12-bit ADC, start cycling A2->A3->A5
 
+    // Init_DAC MUST come after Init_Timers -- it enables the Timer B0 overflow
+    // interrupt (TBIE) to begin the DAC ramp-down sequence (DAC_Begin -> DAC_Adjust).
+    // RED LED turns ON here and OFF when the ramp completes (~10 seconds).
+    Init_DAC();
+
     // Safety: ensure all motors start off via hardware PWM
     Wheels_All_Off();
 
     // IR emitter OFF at startup -- saves battery; turned on during calibration
     P2OUT &= ~IR_LED;
     ir_emitter_on = FALSE;
+
+    // LCD backlight ON (no blinking)
+    P6OUT |= LCD_BACKLITE;
 
     // Initial display
     strcpy(display_line[0], " Project7 ");
@@ -158,7 +160,7 @@ void Update_P7_Display(void){
     char time_str[11];
     unsigned int whole_sec;
     unsigned int frac;
-    int i;
+    unsigned int i;                               // ULP 14.1: use unsigned int for index
 
     // Build the 0.2-second timer string for states where car is active
     // Format: "TTT.Ts    " where TTT = seconds (0-999), T = tenths (0/2/4/6/8)
@@ -166,7 +168,7 @@ void Update_P7_Display(void){
         whole_sec = elapsed_tenths / 5;           // Integer seconds
         frac      = (elapsed_tenths % 5) * 2;     // Tenths digit: 0,2,4,6,8
 
-        for(i = 0; i < 10; i++) time_str[i] = ' ';
+        for(i = 9; i < 10; i--) time_str[i] = ' '; // ULP 13.1: count down
         time_str[10] = '\0';
 
         // Cap display at 999.8 seconds
@@ -274,8 +276,8 @@ void Update_P7_Display(void){
 //
 // Globals used:    p7_state, p7_timer, p7_running, elapsed_tenths,
 //                  p7_timer_running, calibrate_phase, ADC_Left_Detect,
-//                  ADC_Right_Detect, threshold_left, threshold_right,
-//                  circle_direction, follow_start_tenths
+//                  ADC_Right_Detect, white_left, white_right, black_left,
+//                  black_right, circle_direction, follow_start_tenths
 // Globals changed: p7_state, p7_timer, p7_running, elapsed_tenths,
 //                  p7_timer_running, calibrate_phase, threshold_left,
 //                  threshold_right, black_left, black_right, white_left,
@@ -400,7 +402,7 @@ void Run_Project7(void){
                     display_line[2][9]  = ' ';
                     display_line[2][10] = '\0';
 
-                    strcpy(display_line[3], " Starting ");
+                    strcpy(display_line[3], "Press SW1 ");
                     display_changed = TRUE;
                 }
                 break;
@@ -412,16 +414,51 @@ void Run_Project7(void){
         break;
 
     //--------------------------------------------------------------------------
-    // WAIT_START: 2-second delay for operator to step back, then drive forward.
+    // WAIT_START: Calibration done -- wait for operator to press SW1 to confirm
+    //             car is repositioned at the center of the circle.
+    //             SW1 ISR (interrupt_ports.c) advances to P7_ARMED.
     //--------------------------------------------------------------------------
     case P7_WAIT_START:
-        if(p7_timer >= P7_WAIT_START_TIME){
+        // Nothing to poll -- SW1 ISR drives the transition to P7_ARMED.
+        // Display is set once when CAL_BLACK completes (shows "Press SW1").
+        break;
+
+    //--------------------------------------------------------------------------
+    // ARMED: 2-second countdown after SW1 repositioning press.
+    //        Gives operator time to remove hands before motors start.
+    //        ALSO waits for the DAC ramp to finish (TBIE cleared by overflow
+    //        ISR when DAC_data reaches DAC_Adjust -- RED LED turns OFF).
+    //        Without this guard, Forward_On() fires while motor supply is still
+    //        too low (~2V) to overcome wheel static friction.
+    //--------------------------------------------------------------------------
+    case P7_ARMED:
+        if(p7_timer == RESET_STATE){
+            strcpy(display_line[0], " Armed!   ");
+            strcpy(display_line[1], " Starting ");
+            strcpy(display_line[2], "  in 2s   ");
+            strcpy(display_line[3], "          ");
+            display_changed = TRUE;
+        }
+        // 2-second countdown done but DAC ramp still in progress -- wait
+        if(p7_timer >= P7_WAIT_START_TIME && (TB0CTL & TBIE)){
+            if(p7_timer == P7_WAIT_START_TIME){
+                // Show once when countdown expires but ramp not done yet
+                strcpy(display_line[0], "Motor Pwr ");
+                strcpy(display_line[1], " Ramping  ");
+                strcpy(display_line[2], "Wait: RED ");
+                strcpy(display_line[3], "LED off.. ");
+                display_changed = TRUE;
+            }
+            // Stay here until overflow ISR clears TBIE (ramp complete)
+        }
+        // Both done: 2s elapsed AND ramp complete (TBIE cleared, RED LED off)
+        if(p7_timer >= P7_WAIT_START_TIME && !(TB0CTL & TBIE)){
             p7_timer = RESET_STATE;
             p7_state = P7_FORWARD;
 
             // Start the 0.2-second display clock
-            elapsed_tenths    = RESET_STATE;
-            p7_timer_running  = TRUE;
+            elapsed_tenths   = RESET_STATE;
+            p7_timer_running = TRUE;
 
             Forward_On();   // Begin driving toward the circle
 
@@ -435,10 +472,13 @@ void Run_Project7(void){
 
     //--------------------------------------------------------------------------
     // FORWARD: Drive forward until either IR detector sees the black line.
+    //   Guard: ignore detection for first 3 ticks (0.6s) to let car start
+    //   moving and avoid false triggers from residual ADC values.
     //--------------------------------------------------------------------------
     case P7_FORWARD:
-        if((ADC_Left_Detect  > threshold_left) ||
-           (ADC_Right_Detect > threshold_right)){
+        if(p7_timer >= 3 &&
+           ((ADC_Left_Detect  > threshold_left) ||
+            (ADC_Right_Detect > threshold_right))){
 
             Wheels_All_Off();   // Stop immediately (H-bridge safe)
 
@@ -499,47 +539,84 @@ void Run_Project7(void){
         break;
 
     //--------------------------------------------------------------------------
-    // FOLLOW_LINE: Bang-bang line following for two laps.
-    //   left_on  = left detector above threshold (sees black tape)
-    //   right_on = right detector above threshold (sees black tape)
+    // FOLLOW_LINE: Proportional (P-only) line following for two laps.
     //
-    //   Both on:   drive straight
-    //   Left only: left drifted right -> steer left (slow left wheel)
-    //   Right only: right drifted left -> steer right (slow right wheel)
-    //   Neither:   lost line -> gentle straight ahead (search)
+    //   Each sensor is normalized independently to [0, 100]:
+    //     0   = pure white (full reflection, emitter response)
+    //     100 = pure black (no reflection)
+    //   Normalization uses the per-sensor calibration data so that sensor
+    //   hardware differences are cancelled out.
+    //
+    //   error = right_norm - left_norm
+    //     Positive error: right sensor sees more black -> steer right
+    //                     (increase left wheel, decrease right wheel)
+    //     Negative error: left sensor sees more black  -> steer left
+    //
+    //   correction = FOLLOW_KP * error
+    //   left_speed  = FOLLOW_BASE + correction
+    //   right_speed = FOLLOW_BASE - correction
+    //   Both clamped to [WHEEL_OFF, WHEEL_PERIOD_VAL].
     //
     //   Lap tracking: time-based using elapsed_tenths.
     //   After TWO_LAP_TIME_TENTHS, transition to exit.
     //--------------------------------------------------------------------------
     case P7_FOLLOW_LINE:
     {
-        unsigned int left_on  = (ADC_Left_Detect  > threshold_left);
-        unsigned int right_on = (ADC_Right_Detect > threshold_right);
+        unsigned int left_range;
+        unsigned int right_range;
+        int left_norm;
+        int right_norm;
+        int error;
+        int correction;
+        int left_speed;
+        int right_speed;
 
-        // Ensure reverse is off (safety: never mix forward + reverse)
+        // Guard against divide-by-zero if calibration values are equal
+        left_range  = (black_left  > white_left)  ? (black_left  - white_left)  : 1;
+        right_range = (black_right > white_right) ? (black_right - white_right) : 1;
+
+        // Normalize left sensor to [0, 100]
+        if(ADC_Left_Detect <= white_left){
+            left_norm = 0;
+        } else if(ADC_Left_Detect >= black_left){
+            left_norm = 100;
+        } else {
+            left_norm = (int)(((unsigned long)(ADC_Left_Detect - white_left) * 100UL)
+                              / (unsigned long)left_range);
+        }
+
+        // Normalize right sensor to [0, 100]
+        if(ADC_Right_Detect <= white_right){
+            right_norm = 0;
+        } else if(ADC_Right_Detect >= black_right){
+            right_norm = 100;
+        } else {
+            right_norm = (int)(((unsigned long)(ADC_Right_Detect - white_right) * 100UL)
+                               / (unsigned long)right_range);
+        }
+
+        // Proportional control
+        error      = right_norm - left_norm;
+        correction = FOLLOW_KP * error;
+
+        left_speed  = (int)FOLLOW_BASE + correction;
+        right_speed = (int)FOLLOW_BASE - correction;
+
+        // Clamp to valid PWM range.
+        // IMPORTANT: WHEEL_PERIOD_VAL = 50005 overflows a signed 16-bit int
+        // (-15531), so never cast it to int for comparison. Use FOLLOW_MAX_PWM
+        // (32000) as the ceiling -- it fits safely in int and is below CCR0,
+        // avoiding the OUTMOD_7 edge case where CCRx = CCR0 = 0% duty.
+        if(left_speed  < 0)                      left_speed  = 0;
+        if(right_speed < 0)                      right_speed = 0;
+        if(left_speed  > (int)FOLLOW_MAX_PWM)    left_speed  = (int)FOLLOW_MAX_PWM;
+        if(right_speed > (int)FOLLOW_MAX_PWM)    right_speed = (int)FOLLOW_MAX_PWM;
+
+        // Write PWM -- ensure reverse is always off (H-bridge safety)
         LEFT_REVERSE_SPEED  = WHEEL_OFF;
         RIGHT_REVERSE_SPEED = WHEEL_OFF;
-
-        if(left_on && right_on){
-            // Both detectors on the line -- drive straight
-            LEFT_FORWARD_SPEED  = FOLLOW_SPEED;
-            RIGHT_FORWARD_SPEED = FOLLOW_SPEED;
-        }
-        else if(left_on && !right_on){
-            // Left on, right off -- drifted right; steer left (slow left wheel)
-            LEFT_FORWARD_SPEED  = FOLLOW_SLOW;
-            RIGHT_FORWARD_SPEED = FOLLOW_SPEED;
-        }
-        else if(!left_on && right_on){
-            // Right on, left off -- drifted left; steer right (slow right wheel)
-            LEFT_FORWARD_SPEED  = FOLLOW_SPEED;
-            RIGHT_FORWARD_SPEED = FOLLOW_SLOW;
-        }
-        else{
-            // Both off -- lost line; slow search ahead
-            LEFT_FORWARD_SPEED  = FOLLOW_SEARCH;
-            RIGHT_FORWARD_SPEED = FOLLOW_SEARCH;
-        }
+        LEFT_FORWARD_SPEED  = (unsigned int)left_speed;
+        RIGHT_FORWARD_SPEED = (unsigned int)right_speed;
 
         // Check if two laps are complete (time-based)
         if((elapsed_tenths - follow_start_tenths) >= TWO_LAP_TIME_TENTHS){

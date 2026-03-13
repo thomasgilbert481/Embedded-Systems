@@ -17,8 +17,8 @@ extern volatile unsigned char update_display;
 void Init_Conditions(void){
 //------------------------------------------------------------------------------
 
-  int i;
-  for(i=0;i<11;i++){
+  unsigned int i;
+  for(i=10; i<11; i--){              // ULP 13.1: count down; wraps past 0 -> exits
     display_line[0][i] = RESET_STATE;
     display_line[1][i] = RESET_STATE;
     display_line[2][i] = RESET_STATE;

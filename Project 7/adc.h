@@ -34,7 +34,7 @@ extern char ones;       // Ones digit      (ASCII)
 //==============================================================================
 // IR Emitter State (0 = OFF, 1 = ON)
 //==============================================================================
-extern unsigned int ir_emitter_on;
+extern volatile unsigned int ir_emitter_on;  // Written by ISR (SW2) and main loop
 
 //==============================================================================
 // Function Prototypes

@@ -104,13 +104,14 @@
 //------------------------------------------------------------------------------
 #define P7_IDLE              (0)  // Waiting for SW1
 #define P7_CALIBRATE         (1)  // Three-phase calibration: ambient, white, black
-#define P7_WAIT_START        (2)  // Brief delay (~2 sec) for operator to step back
+#define P7_WAIT_START        (2)  // Wait for SW1 press to reposition car before start
 #define P7_FORWARD           (3)  // Drive forward from circle center toward black line
 #define P7_DETECTED_STOP     (4)  // Brief stop on line detection (~1 sec) to confirm
 #define P7_TURNING           (5)  // Rotate to align both detectors over the line
-#define P7_FOLLOW_LINE       (6)  // Bang-bang line following -- core following state
+#define P7_FOLLOW_LINE       (6)  // PID line following -- core following state
 #define P7_EXIT_TURN         (7)  // After 2 laps, turn into circle center
 #define P7_DONE              (8)  // Stopped inside circle; timer frozen
+#define P7_ARMED             (9)  // Calibration done; waiting 2s then start forward
 
 //------------------------------------------------------------------------------
 // Calibration sub-phases (used within P7_CALIBRATE)
@@ -137,9 +138,23 @@
 #define WHEEL_PERIOD_VAL     (50005) // Timer B3 PWM period (~160 Hz at 8 MHz)
 #define FOLLOW_FAST          (35000) // ~70% duty -- straight-ahead burst speed
 #define FOLLOW_SPEED         (25000) // ~50% duty -- normal following speed
-#define FOLLOW_SLOW          (12000) // ~24% duty -- inner-wheel correction speed
-#define FOLLOW_SEARCH        (15000) // ~30% duty -- both-off search/recovery speed
+#define FOLLOW_SLOW          (20000) // ~40% duty -- inner-wheel correction (TUNED: was 12000)
+#define FOLLOW_SEARCH        (25000) // ~50% duty -- both-off search/recovery (TUNED: was 15000)
 #define SPIN_SPEED           (25000) // ~50% duty -- spin turns and alignment
+
+//------------------------------------------------------------------------------
+// PID line following constants
+//   FOLLOW_BASE: base speed applied to both wheels (0% correction = straight)
+//   FOLLOW_KP:   proportional gain; correction = FOLLOW_KP * error
+//                error range: [-100, 100], so max correction = FOLLOW_KP * 100
+//                TUNE FOLLOW_KP on hardware (start low ~100, increase if sluggish)
+//------------------------------------------------------------------------------
+#define FOLLOW_BASE          (25000) // Base PWM: ~50% duty
+#define FOLLOW_KP            (100)   // Proportional gain (TUNE ON HARDWARE)
+// Maximum PWM output for PID clamp.
+// MUST be < 32768 (fits in signed 16-bit int) AND < WHEEL_PERIOD_VAL (50005).
+// Writing CCRx = WHEEL_PERIOD_VAL = CCR0 with OUTMOD_7 gives 0% duty -- avoid!
+#define FOLLOW_MAX_PWM       (32000) // Safe PID output ceiling (fits in int)
 
 //------------------------------------------------------------------------------
 // Wait / delay times (in 200ms ISR ticks; ONE_SEC = 5 ticks)
@@ -172,5 +187,35 @@
 #define DISPLAY_TIMER_TICKS  (1)     // Each 200ms ISR tick = 1 elapsed_tenth (0.2s)
 
 // end of Project 7 additions //////////////////////////////////////////////////
+
+// DAC Motor Power //////////////////////////////////////////////////////////////
+
+//------------------------------------------------------------------------------
+// DAC Voltage Level Constants (SAC3, DACSREF_0 = VCC/AVCC reference)
+//
+// CRITICAL: The DAC feeds the FB_DAC pin of an LT1935 Buck-Boost converter.
+//           The converter output voltage is INVERSELY proportional to the
+//           DAC feedback voltage.
+//             LOWER register value  -->  HIGHER output voltage to motors
+//             HIGHER register value -->  LOWER output voltage to motors
+//
+//   Vout_dac = n/4096 * VCC  (VCC = 3.3V on FR2355 LaunchPad)
+//   DAC_Begin  (1500) --> ~1.21V DAC out --> lower motor voltage, safe start
+//   DAC_Limit  (1200) --> ~0.97V DAC out --> ~6V motor supply (ramp stops)
+//   DAC_Adjust (1200) --> ~0.97V DAC out --> ~6V motor supply (operating pt)
+//   (Per instructor: "somewhere around 1200 will be about 6V")
+//
+// Ramp sequence (Timer B0 overflow ISR, ~0.52s per tick):
+//   Phase 1: count DAC_ENABLE_TICKS overflows, then set P2OUT |= DAC_ENB
+//   Phase 2: decrement DAC_data by DAC_RAMP_STEP each tick until DAC_Limit
+//            When done: set DAC_Adjust, disable TBIE, turn RED LED OFF
+//------------------------------------------------------------------------------
+#define DAC_Begin        (1500)  // Safe startup value (motors at low voltage)
+#define DAC_Limit        (1200)  // Ramp stop threshold: ~6V motor supply
+#define DAC_Adjust       (1200)  // Final operating point: ~6V motor supply
+#define DAC_RAMP_STEP    (50)    // Decrement per overflow tick (per instructor)
+#define DAC_ENABLE_TICKS (3)     // Overflow ticks before enabling DAC_ENB (~1.6s)
+
+// end of DAC Motor Power ///////////////////////////////////////////////////////
 
 #endif /* MACROS_H_ */

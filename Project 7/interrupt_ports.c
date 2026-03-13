@@ -8,6 +8,7 @@
 //               SW1 behavior (Project 7):
 //                 - P7_IDLE:          Start calibration sequence
 //                 - P7_CALIBRATE with CAL_WAIT_BLACK: Advance to black sample
+//                 - P7_WAIT_START:    Arm car (start 2-second countdown)
 //                 - All other states: Ignored
 //
 //               SW2 behavior (Project 7):
@@ -65,6 +66,7 @@ extern unsigned int           calibrate_phase;
 // Globals used:    p7_state, calibrate_phase
 // Globals changed: sw1_debounce_count, p7_state, p7_timer, p7_running,
 //                  calibrate_phase, display_line, display_changed
+// States handled:  P7_IDLE, P7_CALIBRATE (CAL_WAIT_BLACK), P7_WAIT_START
 // Local variables: none
 //==============================================================================
 #pragma vector = PORT4_VECTOR
@@ -81,10 +83,6 @@ __interrupt void switch1_interrupt(void){
         TB0CCTL1 &= ~CCIFG;                   // 4. Clear any pending CCR1 flag
         TB0CCR1   = TB0R + TB0CCR1_INTERVAL;  // 5. Schedule first CCR1 event
         TB0CCTL1 |=  CCIE;                    // 6. Enable CCR1 interrupt
-
-        // Turn off backlight and halt the backlight timer during debounce
-        P6OUT    &= ~LCD_BACKLITE;            // 7.  LCD backlight OFF
-        TB0CCTL0 &= ~CCIE;                    // 8.  Disable CCR0 backlight interrupt
 
         // Project 7 SW1 actions
         switch(p7_state){
@@ -110,6 +108,14 @@ __interrupt void switch1_interrupt(void){
                     calibrate_phase = CAL_BLACK;
                     // Display updated in Run_Project7 CAL_BLACK case
                 }
+                break;
+
+            case P7_WAIT_START:
+                // Operator has repositioned car; start 2-second armed countdown
+                p7_timer = RESET_STATE;
+                p7_state = P7_ARMED;
+                // Display set on first entry of P7_ARMED case in Run_Project7
+                display_changed = TRUE;
                 break;
 
             default:
@@ -152,10 +158,6 @@ __interrupt void switch2_interrupt(void){
         TB0CCTL2 &= ~CCIFG;                   // 4. Clear any pending CCR2 flag
         TB0CCR2   = TB0R + TB0CCR2_INTERVAL;  // 5. Schedule first CCR2 event
         TB0CCTL2 |=  CCIE;                    // 6. Enable CCR2 interrupt
-
-        // Turn off backlight and halt the backlight timer during debounce
-        P6OUT    &= ~LCD_BACKLITE;            // 7.  LCD backlight OFF
-        TB0CCTL0 &= ~CCIE;                    // 8.  Disable CCR0 backlight interrupt
 
         // Emergency stop -- kill all motor PWM outputs immediately
         Wheels_All_Off();
