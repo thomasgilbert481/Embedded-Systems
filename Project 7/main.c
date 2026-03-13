@@ -54,13 +54,6 @@ extern volatile unsigned char update_display;   // Flag: timer says refresh LCD
 extern volatile unsigned int Time_Sequence;     // Master timer counter from ISR
 extern volatile char one_time;                  // One-time execution flag
 
-// Project 5 timing (kept for compatibility)
-volatile unsigned int p5_timer   = RESET_STATE;
-volatile unsigned int p5_running = FALSE;
-unsigned int p5_step    = RESET_STATE;
-char p5_started = FALSE;
-char step_init  = TRUE;
-
 //------------------------------------------------------------------------------
 // Project 7 state machine variables (defined here, extern'd in other files)
 //------------------------------------------------------------------------------
@@ -169,7 +162,7 @@ void Update_P7_Display(void){
     char time_str[11];
     unsigned int whole_sec;
     unsigned int frac;
-    int i;
+    unsigned int i;                               // ULP 14.1: use unsigned int for index
 
     // Build the 0.2-second timer string for states where car is active
     // Format: "TTT.Ts    " where TTT = seconds (0-999), T = tenths (0/2/4/6/8)
@@ -177,7 +170,7 @@ void Update_P7_Display(void){
         whole_sec = elapsed_tenths / 5;           // Integer seconds
         frac      = (elapsed_tenths % 5) * 2;     // Tenths digit: 0,2,4,6,8
 
-        for(i = 0; i < 10; i++) time_str[i] = ' ';
+        for(i = 9; i < 10; i--) time_str[i] = ' '; // ULP 13.1: count down
         time_str[10] = '\0';
 
         // Cap display at 999.8 seconds
