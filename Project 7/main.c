@@ -100,12 +100,20 @@ void main(void){
 
     PM5CTL0 &= ~LOCKLPM5;  // Unlock GPIO (required after reset on FR devices)
 
+    // Init_REF must run before interrupts are enabled -- it contains a blocking
+    // busy-wait (while REFGENRDY is not set) that must complete uninterrupted.
+    Init_REF();             // Enable internal 2.5V reference; wait for stable
+
     Init_Ports();           // Configure all GPIO (motor pins set for Timer B3)
     Init_Clocks();          // Configure clock system (8 MHz MCLK/SMCLK)
     Init_Conditions();      // Initialize variables, enable global interrupts
     Init_Timers();          // Timer B0 (200ms) + Timer B3 (hardware PWM)
     Init_LCD();             // Initialize LCD display (SPI)
     Init_ADC();             // Initialize 12-bit ADC, start cycling A2->A3->A5
+
+    // Init_DAC configures SAC3 (12-bit DAC buffer mode) and asserts DAC_ENB LOW.
+    // DAC_ENB goes HIGH only when the car begins moving (P7_WAIT_START exit).
+    Init_DAC();
 
     // Safety: ensure all motors start off via hardware PWM
     Wheels_All_Off();
@@ -426,6 +434,9 @@ void Run_Project7(void){
             elapsed_tenths    = RESET_STATE;
             p7_timer_running  = TRUE;
 
+            // Enable DAC board -- provides motor supply voltage via H-bridge
+            P2OUT |= DAC_ENB;
+
             Forward_On();   // Begin driving toward the circle
 
             strcpy(display_line[0], "Intercept ");
@@ -595,6 +606,7 @@ void Run_Project7(void){
         }
         if(p7_timer >= EXIT_FORWARD_TIME){
             Wheels_All_Off();    // Full stop
+            P2OUT &= ~DAC_ENB;  // Remove motor supply voltage (DAC board off)
 
             p7_running       = FALSE;   // Stop state timer
             p7_timer_running = FALSE;   // Freeze the display clock

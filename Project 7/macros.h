@@ -173,4 +173,22 @@
 
 // end of Project 7 additions //////////////////////////////////////////////////
 
+// DAC Motor Power //////////////////////////////////////////////////////////////
+
+//------------------------------------------------------------------------------
+// DAC Tuning Constants (SAC3 -- 12-bit DAC, Vref = 2.5V internal reference)
+//   DAC_INIT_VALUE : starting DAC code written to SAC3DAT at Init_DAC().
+//                    4000/4096 * 2.5V = ~2.44V; DAC board amplifies this to
+//                    a higher motor supply voltage.
+//   DAC_MIN_VALUE  : not used in Project 7 (constant DAC output).
+//   DAC_STEP       : not used in Project 7 (constant DAC output).
+//   DAC_STARTUP_TICKS : not used in Project 7.
+//------------------------------------------------------------------------------
+#define DAC_INIT_VALUE    (4000)   // Starting code -- near full scale (~2.44V)
+#define DAC_MIN_VALUE     (1200)   // Unused in P7 (kept for dac.c compatibility)
+#define DAC_STEP          (50)     // Unused in P7
+#define DAC_STARTUP_TICKS (3)      // Unused in P7
+
+// end of DAC Motor Power ///////////////////////////////////////////////////////
+
 #endif /* MACROS_H_ */

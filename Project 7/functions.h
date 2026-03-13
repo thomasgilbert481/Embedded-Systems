@@ -151,3 +151,8 @@ void Run_Project6(void);
 // Project 7 state machine and display
 void Run_Project7(void);
 void Update_P7_Display(void);
+
+// DAC Motor Power (dac.c)
+void Init_REF(void);    // Enable internal 2.5V reference (call before interrupts)
+void Init_DAC(void);    // Configure SAC3 in 12-bit DAC buffer mode
+extern volatile unsigned int DAC_data;  // Current 12-bit DAC code (0-4095)

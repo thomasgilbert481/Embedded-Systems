@@ -151,6 +151,7 @@ __interrupt void switch2_interrupt(void){
 
         // Emergency stop -- kill all motor PWM outputs immediately
         Wheels_All_Off();
+        P2OUT &= ~DAC_ENB;    // Remove motor supply voltage (DAC board off)
 
         // Turn off IR emitter to conserve power
         P2OUT        &= ~IR_LED;
