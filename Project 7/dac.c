@@ -1,25 +1,26 @@
 //******************************************************************************
 // File Name:    dac.c
-// Description:  DAC initialization for Project DAC -- Motor Power Demo.
-//               Configures the internal 2.5V reference (PMM module) and
-//               SAC3 in 12-bit DAC buffer mode to generate an analog output
-//               on P3.5 (OA1O).  The external DAC board amplifies this signal
-//               to drive the motors.
+// Description:  DAC initialization for Project 7 -- Motor Power via SAC3.
+//               Configures the SAC3 12-bit DAC in op-amp buffer mode using VCC
+//               as the reference (DACSREF_0).  The DAC output on P3.5 feeds the
+//               FB_DAC pin of the LT1935 Buck-Boost converter, which provides
+//               the motor supply voltage.
 //
-//               Key hardware:
-//                 SAC3DAT  -- 12-bit DAC data register (0x000 = 0V, 0xFFF = Vref)
-//                 P3.5     -- DAC analog output (enabled via P3SELC)
-//                 P2.5     -- DAC_ENB: HIGH enables DAC board, LOW disables it
+//               IMPORTANT -- output is INVERTED:
+//                 Lower SAC3DAT value  -->  higher buck-boost output voltage
+//                 Higher SAC3DAT value -->  lower buck-boost output voltage
 //
-// Safety notes:
-//   - Init_REF() contains a blocking busy-wait on REFGENRDY.  Call it before
-//     interrupts are enabled so the wait cannot be preempted unexpectedly.
-//   - Init_DAC() explicitly drives DAC_ENB LOW after configuring the hardware
-//     to prevent an uncontrolled motor surge at startup.  The demo state machine
-//     (Run_DAC_Demo in main.c) enables DAC_ENB only after the settling delay.
-//   - DAC_data is declared volatile because it is written by the CCR0 ISR and
-//     read by the main loop; both accesses are 16-bit and therefore atomic on
-//     the MSP430, but volatile ensures the compiler does not cache the value.
+//               Startup sequence:
+//                 1. Init_DAC() sets SAC3DAT = DAC_Begin (2725, ~2V -- safe)
+//                 2. Init_DAC() enables Timer B0 overflow interrupt (TBIE)
+//                 3. RED LED turns ON to show ramp is in progress
+//                 4. Each overflow tick (~0.52s): DAC_data -= DAC_RAMP_STEP (100)
+//                 5. When DAC_data <= DAC_Limit (850): set to DAC_Adjust (875),
+//                    disable TBIE, turn RED LED OFF
+//                 6. Motor supply is now ~6V; PWM controls direction/speed
+//
+//               P3.5 (DAC_CNTL) is switched to analog mode via P3SELC.
+//               P2.5 (DAC_ENB) is left HIGH from ports.c -- buck-boost always on.
 //
 // Author:       Thomas Gilbert
 // Date:         Mar 2026
@@ -35,70 +36,49 @@
 //==============================================================================
 // Global variable
 //==============================================================================
-volatile unsigned int DAC_data;  // Current 12-bit DAC code (0–4095)
-                                 // Written by CCR0 ISR, read by main loop
-
-//==============================================================================
-// Function: Init_REF
-// Description: Unlock the PMM registers, enable the internal reference module,
-//              select the 2.5V output, and block until the reference is stable.
-//
-//              CALL BEFORE Init_Ports() / enable_interrupts() so the blocking
-//              while loop completes before any ISR can preempt it.
-//
-// Globals used:    none
-// Globals changed: none (PMM hardware registers only)
-// Local variables: none
-//==============================================================================
-void Init_REF(void){
-//------------------------------------------------------------------------------
-
-    PMMCTL0_H = PMMPW_H;            // Unlock PMM registers (password byte)
-    PMMCTL2   = INTREFEN;           // Enable internal reference module
-    PMMCTL2  |= REFVSEL_2;          // Select 2.5V reference output
-
-    // Poll until the reference generator signals ready (~30 µs typical).
-    // TI recommends this exact pattern; see MSP430FR2355 data sheet.
-    // Note: no exit strategy -- acceptable per instructor guidance and TI docs.
-    while(!(PMMCTL2 & REFGENRDY));  // Wait for REFGENRDY flag
-
-//------------------------------------------------------------------------------
-}
+volatile unsigned int DAC_data;  // Current 12-bit DAC code (0-4095)
+                                 // Written by overflow ISR and Init_DAC
 
 //==============================================================================
 // Function: Init_DAC
-// Description: Configure SAC3 as a 12-bit DAC in op-amp buffer mode using the
-//              internal 2.5V reference.  The op-amp buffers the DAC output to
-//              improve drive strength on P3.5.
+// Description: Configure SAC3 as a 12-bit DAC in op-amp buffer mode using VCC
+//              as the reference voltage.  Starts the automatic ramp-down
+//              sequence by enabling the Timer B0 overflow interrupt.
+//
+//              Init_Timers() MUST be called before Init_DAC() because this
+//              function enables TB0CTL TBIE -- Timer B0 must already be running.
 //
 //              Initialization order (must follow this sequence):
-//                1. Load DAC data register (SAC3DAT)
-//                2. Configure DAC control (SAC3DAC) -- reference, latch mode
+//                1. Set initial DAC register to safe startup value (DAC_Begin)
+//                2. Configure DAC control (SAC3DAC) -- VCC reference, latch mode
 //                3. Configure OA control (SAC3OA)   -- MUX, source selection
 //                4. Set PGA mode (SAC3PGA)           -- buffer
-//                5. Enable DAC (DACEN), then SAC (SACEN), then OA (OAEN)
+//                5. Enable SAC (SACEN), then OA (OAEN)
 //                6. Configure P3.5 for analog output via P3SELC
-//                7. Assert DAC_ENB LOW to keep DAC board disabled at startup
+//                7. Enable DACEN last
+//                8. Enable Timer B0 overflow interrupt to start the ramp
 //
 // Globals used:    DAC_data
-// Globals changed: DAC_data (set to DAC_INIT_VALUE)
+// Globals changed: DAC_data (set to DAC_Begin)
 // Local variables: none
 //==============================================================================
 void Init_DAC(void){
 //------------------------------------------------------------------------------
 
     // -------------------------------------------------------------------------
-    // 1. Pre-load DAC register with starting value
+    // 1. Pre-load DAC register with safe startup value
+    //    DAC_Begin = 2725 --> ~2.0V output --> motor supply too low to spin
     // -------------------------------------------------------------------------
-    DAC_data = DAC_INIT_VALUE;       // 4000 out of 4096 -- near full scale
+    DAC_data = DAC_Begin;            // Safe starting point
     SAC3DAT  = DAC_data;             // Write to hardware DAC register
 
     // -------------------------------------------------------------------------
-    // 2. DAC control: reference source and latch mode
+    // 2. DAC control: VCC reference and latch mode
+    //    DACSREF_0: VCC as reference (NOT the internal 2.5V ref)
+    //    DACLSEL_0: Latch DAC data immediately when SAC3DAT is written
     // -------------------------------------------------------------------------
-    SAC3DAC  = DACSREF_1;            // Internal Vref (2.5V) as DAC reference
+    SAC3DAC  = DACSREF_0;            // VCC as DAC reference (required for buck-boost)
     SAC3DAC |= DACLSEL_0;            // Latch DAC data when SAC3DAT is written
-    SAC3DAC |= DACEN;                // Enable the 12-bit DAC core
 
     // -------------------------------------------------------------------------
     // 3. Op-amp control: configure MUX and signal routing
@@ -110,7 +90,7 @@ void Init_DAC(void){
     SAC3OA  |= OAPM;                 // Low speed / low power OA mode
 
     // -------------------------------------------------------------------------
-    // 4. PGA mode: unity-gain buffer (DAC output follows OA output)
+    // 4. PGA mode: unity-gain buffer
     // -------------------------------------------------------------------------
     SAC3PGA  = MSEL_1;               // Set OA as buffer (unity gain)
 
@@ -125,17 +105,23 @@ void Init_DAC(void){
     //    P3SEL0 and P3SEL1 are already cleared in ports.c (GPIO mode).
     //    Setting P3SELC selects the analog/DAC function on this pin.
     // -------------------------------------------------------------------------
-    P3OUT   &= ~DAC_CNTL;            // Ensure pin is driven low
+    P3OUT   &= ~DAC_CNTL;            // Ensure pin output register is low
     P3DIR   &= ~DAC_CNTL;            // Direction: input (DAC peripheral drives it)
-    P3SELC  |=  DAC_CNTL;            // Enable analog function on P3.5 (OA1O)
+    P3SELC  |=  DAC_CNTL;            // Enable analog function on P3.5
 
     // -------------------------------------------------------------------------
-    // 7. Keep DAC board disabled at startup
-    //    ports.c initializes DAC_ENB (P2.5) HIGH, which would enable the board
-    //    immediately and cause an uncontrolled motor surge.  Override that here.
-    //    Run_DAC_Demo() will set DAC_ENB HIGH after the startup settling delay.
+    // 7. Enable the DAC core last
     // -------------------------------------------------------------------------
-    P2OUT   &= ~DAC_ENB;             // DAC board OFF -- enabled later by demo SM
+    SAC3DAC |= DACEN;                // Enable 12-bit DAC core
+
+    // -------------------------------------------------------------------------
+    // 8. Start ramp-down sequence via Timer B0 overflow interrupt
+    //    Each overflow tick (~0.52s): DAC_data decrements by DAC_RAMP_STEP (100)
+    //    The ISR stops when DAC_data <= DAC_Limit and sets DAC_Adjust.
+    //    RED LED on = ramp in progress; off = ramp complete, motors can run.
+    // -------------------------------------------------------------------------
+    TB0CTL  |= TBIE;                 // Enable Timer B0 overflow interrupt
+    P1OUT   |= RED_LED;              // RED LED ON -- ramp starting
 
 //------------------------------------------------------------------------------
 }

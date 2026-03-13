@@ -153,6 +153,7 @@ void Run_Project7(void);
 void Update_P7_Display(void);
 
 // DAC Motor Power (dac.c)
-void Init_REF(void);    // Enable internal 2.5V reference (call before interrupts)
-void Init_DAC(void);    // Configure SAC3 in 12-bit DAC buffer mode
+// NOTE: DACSREF_0 (VCC reference) -- no Init_REF() needed.
+//       Call Init_DAC() AFTER Init_Timers() (enables Timer B0 overflow for ramp).
+void Init_DAC(void);    // Configure SAC3 in 12-bit DAC buffer mode; starts ramp
 extern volatile unsigned int DAC_data;  // Current 12-bit DAC code (0-4095)

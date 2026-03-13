@@ -176,18 +176,25 @@
 // DAC Motor Power //////////////////////////////////////////////////////////////
 
 //------------------------------------------------------------------------------
-// DAC Tuning Constants (SAC3 -- 12-bit DAC, Vref = 2.5V internal reference)
-//   DAC_INIT_VALUE : starting DAC code written to SAC3DAT at Init_DAC().
-//                    4000/4096 * 2.5V = ~2.44V; DAC board amplifies this to
-//                    a higher motor supply voltage.
-//   DAC_MIN_VALUE  : not used in Project 7 (constant DAC output).
-//   DAC_STEP       : not used in Project 7 (constant DAC output).
-//   DAC_STARTUP_TICKS : not used in Project 7.
+// DAC Voltage Level Constants (SAC3, DACSREF_0 = VCC reference)
+//
+// CRITICAL: The DAC feeds the FB_DAC pin of an LT1935 Buck-Boost converter.
+//           The converter output voltage is INVERSELY proportional to the
+//           DAC feedback voltage.
+//             LOWER register value  -->  HIGHER output voltage to motors
+//             HIGHER register value -->  LOWER output voltage to motors
+//
+//   DAC_Begin  (2725) --> ~2.0V DAC out --> motor supply too low to spin
+//   DAC_Limit  (850)  --> ~3.4V DAC out --> ~6.08V motor supply (ramp stops)
+//   DAC_Adjust (875)  --> ~3.4V DAC out --> ~6.00V motor supply (operating pt)
+//
+// The ramp runs in the Timer B0 overflow ISR: DAC_data -= 100 each ~0.52s tick
+// until DAC_data <= DAC_Limit, then it is set to DAC_Adjust and overflow stops.
 //------------------------------------------------------------------------------
-#define DAC_INIT_VALUE    (4000)   // Starting code -- near full scale (~2.44V)
-#define DAC_MIN_VALUE     (1200)   // Unused in P7 (kept for dac.c compatibility)
-#define DAC_STEP          (50)     // Unused in P7
-#define DAC_STARTUP_TICKS (3)      // Unused in P7
+#define DAC_Begin   (2725)   // Safe startup: ~2.0V -- motors won't spin
+#define DAC_Limit   (850)    // Ramp stop threshold: ~6.08V motor supply
+#define DAC_Adjust  (875)    // Final operating point: ~6.00V motor supply
+#define DAC_RAMP_STEP (100)  // Decrement per Timer B0 overflow tick (~0.52s)
 
 // end of DAC Motor Power ///////////////////////////////////////////////////////
 

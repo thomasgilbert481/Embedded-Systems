@@ -45,6 +45,9 @@ extern volatile unsigned int p7_running;        // TRUE = ISR increments p7_time
 extern volatile unsigned int elapsed_tenths;    // 0.2-second display counter
 extern volatile unsigned int p7_timer_running;  // TRUE = ISR increments elapsed_tenths
 
+// From dac.c (DAC motor power ramp)
+extern volatile unsigned int DAC_data;          // Current 12-bit DAC code
+
 //==============================================================================
 // ISR: Timer0_B0_ISR
 // Description:  Timer B0 CCR0 interrupt -- fires every 200ms.
@@ -153,7 +156,17 @@ __interrupt void TIMER0_B1_ISR(void){
             TB0CCR2 += TB0CCR2_INTERVAL;      // Re-arm CCR2 for next 200ms
             break;
 
-        case 14:                              // Timer overflow -- not used
+        case 14:                              // Timer overflow -- DAC ramp-down
+            // Decrement DAC register value (lower value = higher motor voltage)
+            // Ramp: DAC_Begin (2725, ~2V) -> DAC_Adjust (875, ~6V)
+            DAC_data -= DAC_RAMP_STEP;        // Each step increases motor voltage
+            SAC3DAT   = DAC_data;             // Update the hardware DAC register
+            if(DAC_data <= DAC_Limit){        // Reached target voltage?
+                DAC_data = DAC_Adjust;        // Set exact operating point
+                SAC3DAT  = DAC_data;          // Write final value
+                TB0CTL  &= ~TBIE;             // Disable overflow interrupt -- done
+                P1OUT   &= ~RED_LED;          // RED LED OFF -- ramp complete
+            }
             break;
 
         default:
