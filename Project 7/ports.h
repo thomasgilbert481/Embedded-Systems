@@ -12,20 +12,23 @@
 //------------------------------------------------------------------------------
 // Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins
 //
-//   CORRECTED mapping (per MSP430FR2355 Timer B3 TB3.x pinout):
-//     TB3.1 -> P6.1 -> R_FORWARD (0x02)
-//     TB3.2 -> P6.2 -> L_FORWARD (0x04)
-//     TB3.3 -> P6.3 -> R_REVERSE (0x08)
-//     TB3.4 -> P6.4 -> L_REVERSE (0x10)
+//   Actual hardware wiring (verified by hardware test):
+//     TB3.1 -> P6.1 -> R_REVERSE (0x02)   <-- right motor reverse input
+//     TB3.2 -> P6.2 -> L_FORWARD (0x04)   <-- left motor forward input
+//     TB3.3 -> P6.3 -> R_FORWARD (0x08)   <-- right motor forward input
+//     TB3.4 -> P6.4 -> L_REVERSE (0x10)   <-- left motor reverse input
+//
+//   NOTE: P6.1 and P6.3 are swapped relative to initial labeling.
+//         CCR3 drives right forward; CCR1 drives right reverse.
 //
 //   PWM_PERIOD is the Timer B3 period register (TB3CCR0).
 //   WHEEL_PERIOD_VAL (50005) is the value loaded into PWM_PERIOD.
 //   PERCENT_80 (40004) is 80% of WHEEL_PERIOD_VAL.
 //------------------------------------------------------------------------------
 #define PWM_PERIOD            (TB3CCR0)  // Timer B3 period register
-#define RIGHT_FORWARD_SPEED   (TB3CCR1)  // P6.1 R_FORWARD
+#define RIGHT_FORWARD_SPEED   (TB3CCR3)  // P6.3 R_FORWARD (actual wiring)
 #define LEFT_FORWARD_SPEED    (TB3CCR2)  // P6.2 L_FORWARD
-#define RIGHT_REVERSE_SPEED   (TB3CCR3)  // P6.3 R_REVERSE
+#define RIGHT_REVERSE_SPEED   (TB3CCR1)  // P6.1 R_REVERSE (actual wiring)
 #define LEFT_REVERSE_SPEED    (TB3CCR4)  // P6.4 L_REVERSE
 
 #define WHEEL_PERIOD_VAL      (50005)    // Timer B3 PWM period count
@@ -80,9 +83,9 @@
 
 // Port 6 Pins
 #define LCD_BACKLITE           (0x01) // 6.0 LCD_BACKLITE
-#define R_FORWARD              (0x02) // 6.1 Right Forward  --> TB3CCR1 PWM
+#define R_REVERSE              (0x02) // 6.1 Right Reverse  --> TB3CCR1 PWM (actual wiring)
 #define L_FORWARD              (0x04) // 6.2 Left Forward   --> TB3CCR2 PWM
-#define R_REVERSE              (0x08) // 6.3 Right Reverse  --> TB3CCR3 PWM
+#define R_FORWARD              (0x08) // 6.3 Right Forward  --> TB3CCR3 PWM (actual wiring)
 #define L_REVERSE              (0x10) // 6.4 Left Reverse   --> TB3CCR4 PWM
 #define P6_5                   (0x20) // 6.5 (unused)
 #define GRN_LED                (0x40) // 6.6 GREEN LED

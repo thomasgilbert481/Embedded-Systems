@@ -4,10 +4,10 @@
 //              H-Bridge safety: NEVER set a forward AND reverse CCR nonzero
 //              simultaneously on the same wheel.
 //
-//   CCR register mapping (ports.h):
-//     RIGHT_FORWARD_SPEED = TB3CCR1  (P6.1, R_FORWARD)
+//   CCR register mapping (ports.h) -- verified by hardware test:
+//     RIGHT_FORWARD_SPEED = TB3CCR3  (P6.3, R_FORWARD)
 //     LEFT_FORWARD_SPEED  = TB3CCR2  (P6.2, L_FORWARD)
-//     RIGHT_REVERSE_SPEED = TB3CCR3  (P6.3, R_REVERSE)
+//     RIGHT_REVERSE_SPEED = TB3CCR1  (P6.1, R_REVERSE)
 //     LEFT_REVERSE_SPEED  = TB3CCR4  (P6.4, L_REVERSE)
 //
 // Author: Thomas Gilbert

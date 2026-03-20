@@ -132,8 +132,8 @@
 //   Start with Kp=1, Kd=5, divisor=10 and adjust on hardware.
 //------------------------------------------------------------------------------
 #define KP_VALUE             (1)
-#define KD_VALUE             (5)
-#define PD_SCALE_DIVISOR     (10)
+#define KD_VALUE             (3)
+#define PD_SCALE_DIVISOR     (20)
 
 //------------------------------------------------------------------------------
 // Motor speeds (Timer B3 PWM -- must be < WHEEL_PERIOD_VAL = 50005)
@@ -149,7 +149,7 @@
 //------------------------------------------------------------------------------
 // Wait/delay times (5ms ticks)
 //------------------------------------------------------------------------------
-#define P7_WAIT_START_TIME   (400)   // 400 * 5ms = 2 sec before driving
+#define P7_WAIT_START_TIME   (1000)  // 1000 * 5ms = 5 sec before driving
 #define P7_DETECT_STOP_TIME  (200)   // 200 * 5ms = 1 sec on detection
 #define P7_INITIAL_TURN_TIME (200)   // 200 * 5ms = 1 sec alignment (TUNE)
 

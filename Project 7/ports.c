@@ -243,20 +243,20 @@ void Init_Port6(void){
     P6OUT  &= ~LCD_BACKLITE;     // Backlight OFF at startup
     P6DIR  |=  LCD_BACKLITE;     // Output
 
-    // Right Forward Motor (P6.1) -- Timer B3 CCR1 PWM output
-    P6SEL0 |=  R_FORWARD;        // Timer B3 function: SEL0=1
-    P6SEL1 &= ~R_FORWARD;        // Timer B3 function: SEL1=0
-    P6DIR  |=  R_FORWARD;        // Output (required for timer output)
+    // Right Reverse Motor (P6.1) -- Timer B3 CCR1 PWM output (actual wiring)
+    P6SEL0 |=  R_REVERSE;        // Timer B3 function: SEL0=1
+    P6SEL1 &= ~R_REVERSE;        // Timer B3 function: SEL1=0
+    P6DIR  |=  R_REVERSE;        // Output (required for timer output)
 
     // Left Forward Motor (P6.2) -- Timer B3 CCR2 PWM output
     P6SEL0 |=  L_FORWARD;
     P6SEL1 &= ~L_FORWARD;
     P6DIR  |=  L_FORWARD;
 
-    // Right Reverse Motor (P6.3) -- Timer B3 CCR3 PWM output
-    P6SEL0 |=  R_REVERSE;
-    P6SEL1 &= ~R_REVERSE;
-    P6DIR  |=  R_REVERSE;
+    // Right Forward Motor (P6.3) -- Timer B3 CCR3 PWM output (actual wiring)
+    P6SEL0 |=  R_FORWARD;
+    P6SEL1 &= ~R_FORWARD;
+    P6DIR  |=  R_FORWARD;
 
     // Left Reverse Motor (P6.4) -- Timer B3 CCR4 PWM output
     P6SEL0 |=  L_REVERSE;
