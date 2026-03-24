@@ -48,7 +48,7 @@
 
 // Baud rate selections
 #define BAUD_115200          (0)
-#define BAUD_460800          (1)
+#define BAUD_57600           (1)
 
 // Display line length (10 chars + null)
 #define DISPLAY_LINE_LEN     (11)
