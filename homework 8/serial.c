@@ -9,7 +9,7 @@
 //
 // Baud rate table (BRCLK = SMCLK = 8 MHz):
 //   115,200: UCOS16=1, UCBRx=4,  UCFx=5,  UCSx=0x55 => MCTLW=0x5551, BRW=4
-//   460,800: UCOS16=0, UCBRx=17, UCFx=0,  UCSx=0x4A => MCTLW=0x4A00, BRW=17
+//    57,600: UCOS16=1, UCBRx=8,  UCFx=10, UCSx=0xF7 => MCTLW=0xF7A1, BRW=8
 //
 // Author: Thomas Gilbert
 // Date: Mar 2026
@@ -41,10 +41,6 @@ volatile char PC_2_IOT[SMALL_RING_SIZE];
 volatile unsigned int pc_rx_wr = BEGINNING;
 volatile unsigned int pc_rx_rd = BEGINNING;
 
-// UCA1 transmit buffer (for Transmit_String_UCA1)
-volatile char UCA1_transmit_buf[25];
-volatile unsigned int uca1_tx_index = BEGINNING;
-volatile unsigned int UCA1_tx_active = BEGINNING;
 
 // Received character display buffer (read by main loop to update LCD line 1)
 volatile char received_string[11] = "          ";
@@ -130,20 +126,16 @@ void Set_Baud_Rate(unsigned int baud_select){
 }
 
 //==============================================================================
-// Transmit_String_UCA1 -- Load a string and start transmitting via UCA1 TX ISR
-//   Copies string into UCA1_transmit_buf, sets UCA1_tx_active, enables UCTXIE.
-//   The TX ISR sends one character per TXIFG interrupt until null terminator.
+// Transmit_String_UCA1 -- Send a string out UCA1 using polling (no TX ISR).
+//   Polls UCTXIFG before each byte so it never overwrites a byte mid-send.
+//   Avoids conflicts with the direct UCA1TXBUF writes in the UCA0 RX ISR.
 //==============================================================================
 void Transmit_String_UCA1(const char *string){
     unsigned int i = BEGINNING;
-    while(string[i] != '\0' && i < 24){
-        UCA1_transmit_buf[i] = string[i];
-        i++;
+    while(string[i] != '\0'){
+        while(!(UCA1IFG & UCTXIFG));   // Wait until TX buffer is empty
+        UCA1TXBUF = string[i++];
     }
-    UCA1_transmit_buf[i] = '\0';
-    uca1_tx_index = BEGINNING;
-    UCA1_tx_active = TRUE;
-    UCA1IE |= UCTXIE;              // Enable TX interrupt to start sending
 }
 
 //==============================================================================
@@ -192,15 +184,14 @@ __interrupt void eUSCI_A0_ISR(void){
 }
 
 //==============================================================================
-// eUSCI_A1 ISR -- UCA1 (PC backchannel / J14) RX and TX
+// eUSCI_A1 ISR -- UCA1 (PC backchannel / J14) RX only
 //
 //   RX (case 2): Character arrived from PC (Termite).
 //     - Store in PC_2_IOT ring buffer
-//     - Forward directly to UCA0 TXBUF (out to J9 / IOT)
+//     - Forward directly to UCA0 TXBUF (out to J9 loopback)
 //
-//   TX (case 4): Used when Transmit_String_UCA1 sends a string.
-//     - Sends one character per interrupt until null terminator.
-//     - Disables UCTXIE when string transmission is complete.
+//   TX (case 4): UCTXIE is never enabled -- Transmit_String_UCA1 uses polling.
+//     Safety disable in case TXIFG fires unexpectedly.
 //==============================================================================
 #pragma vector = EUSCI_A1_VECTOR
 __interrupt void eUSCI_A1_ISR(void){
@@ -223,19 +214,8 @@ __interrupt void eUSCI_A1_ISR(void){
             UCA0TXBUF = receive_val;
             break;
 
-        case 4:                                // TXIFG -- transmit next char of string
-            if(UCA1_tx_active){
-                if(UCA1_transmit_buf[uca1_tx_index] != '\0'){
-                    UCA1TXBUF = UCA1_transmit_buf[uca1_tx_index++];
-                }
-                // Check again (index advanced above)
-                if(UCA1_transmit_buf[uca1_tx_index] == '\0'){
-                    UCA1IE    &= ~UCTXIE;  // Done -- disable TX interrupt
-                    UCA1_tx_active = FALSE;
-                }
-            } else {
-                UCA1IE &= ~UCTXIE;         // Safety: disable if nothing pending
-            }
+        case 4:                                // TXIFG -- should not occur; disable
+            UCA1IE &= ~UCTXIE;
             break;
 
         default:
