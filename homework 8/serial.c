@@ -100,16 +100,16 @@ void Init_Serial_UCA1(void){
 
 //==============================================================================
 // Set_Baud_Rate -- Change baud rate on both UCA0 and UCA1 simultaneously
-//   baud_select: BAUD_115200 (0) or BAUD_460800 (1)
+//   baud_select: BAUD_115200 (0) or BAUD_57600 (1)
 //   Both ports must be placed in reset (UCSWRST) to change baud registers.
 //==============================================================================
 void Set_Baud_Rate(unsigned int baud_select){
     // --- UCA0 ---
     UCA0CTLW0 |= UCSWRST;
-    if(baud_select == BAUD_460800){
-        // 460,800 baud: UCBRx=17, UCOS16=0, UCFx=0, UCSx=0x4A
-        UCA0BRW   = 17;
-        UCA0MCTLW = 0x4A00;
+    if(baud_select == BAUD_57600){
+        // 57,600 baud: UCBRx=8, UCOS16=1, UCFx=10(0xA), UCSx=0xF7
+        UCA0BRW   = 8;
+        UCA0MCTLW = 0xF7A1;
     } else {
         // 115,200 baud (default)
         UCA0BRW   = 4;
@@ -119,9 +119,9 @@ void Set_Baud_Rate(unsigned int baud_select){
 
     // --- UCA1 ---
     UCA1CTLW0 |= UCSWRST;
-    if(baud_select == BAUD_460800){
-        UCA1BRW   = 17;
-        UCA1MCTLW = 0x4A00;
+    if(baud_select == BAUD_57600){
+        UCA1BRW   = 8;
+        UCA1MCTLW = 0xF7A1;
     } else {
         UCA1BRW   = 4;
         UCA1MCTLW = 0x5551;

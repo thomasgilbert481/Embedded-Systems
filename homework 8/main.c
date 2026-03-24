@@ -15,13 +15,13 @@
 //
 //   Controls:
 //     SW1 -- switch to 115,200 baud; 2s later transmit "NCSU  #1" out UCA1
-//     SW2 -- switch to 460,800 baud; 2s later transmit "NCSU  #1" out UCA1
+//     SW2 -- switch to 57,600 baud; 2s later transmit "NCSU  #1" out UCA1
 //
 //   LCD display (after 5-second splash):
 //     Line 1: Characters received from J9 loopback (updated each 200ms tick)
 //     Line 2: (blank)
 //     Line 3: "   Baud   "
-//     Line 4: " 115,200  " or " 460,800  "
+//     Line 4: " 115,200  " or "  57,600  "
 //
 // Author: Thomas Gilbert
 // Date: Mar 2026
@@ -57,7 +57,7 @@ extern volatile unsigned int received_index;       // Number of received charact
 
 // Switch press flags -- set by ISRs in interrupt_ports.c, cleared here
 volatile unsigned int sw1_pressed = RESET_STATE;  // SW1 sets to 115,200 baud
-volatile unsigned int sw2_pressed = RESET_STATE;  // SW2 sets to 460,800 baud
+volatile unsigned int sw2_pressed = RESET_STATE;  // SW2 sets to 57,600 baud
 
 // Current active baud rate
 unsigned int current_baud = BAUD_115200;
@@ -142,18 +142,18 @@ void main(void){
         }
 
         //----------------------------------------------------------------------
-        // SW2 pressed -- switch to 460,800 baud
+        // SW2 pressed -- switch to 57,600 baud
         //----------------------------------------------------------------------
         if(sw2_pressed){
             sw2_pressed = RESET_STATE;
 
-            current_baud = BAUD_460800;
-            Set_Baud_Rate(BAUD_460800);
+            current_baud = BAUD_57600;
+            Set_Baud_Rate(BAUD_57600);
 
             strcpy(display_line[0], "          ");
             strcpy(display_line[1], "          ");
             strcpy(display_line[2], "   Baud   ");
-            strcpy(display_line[3], " 460,800  ");
+            strcpy(display_line[3], "  57,600  ");
             display_changed = TRUE;
 
             // Clear received buffer
