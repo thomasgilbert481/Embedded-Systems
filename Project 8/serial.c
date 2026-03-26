@@ -58,7 +58,8 @@ volatile unsigned char command_ready = 0;         // 1 when full command is asse
 // Active baud rate index — determines which register values Init_Serial_UCA0 loads
 unsigned char baud_rate_index = BAUD_9600;        // Start at 9,600 baud
 
-// Character count used while assembling a command from individual ring-buffer bytes
+// Character count used while assembling a command from individual ring-buffer bytes.
+// Module-level (not function-local) so Clear_Serial_Buffers() can reset it.
 static unsigned int rx_char_count = BEGINNING;
 
 //==============================================================================
@@ -214,6 +215,33 @@ void Update_Baud_Display(void){
             break;
     }
     display_changed = 1;
+}
+
+//==============================================================================
+// Function: Clear_Serial_Buffers
+// Description: Resets all RX and TX buffer state. Call this before switching
+//              baud rates so no bytes received at the old rate get processed
+//              or retransmitted at the new rate.
+//
+//              - Disables UCTXIE to abort any in-progress transmission
+//              - Resets ring buffer indices (discards unread RX bytes)
+//              - Resets TX index and command assembly state
+//              - Clears command_ready so a stale command is not acted on
+//==============================================================================
+void Clear_Serial_Buffers(void){
+    // Abort any TX in progress
+    UCA0IE &= ~UCTXIE;
+
+    // Reset ring buffer indices — bytes written at the old baud rate are discarded
+    iot_rx_wr = BEGINNING;
+    iot_rx_rd = BEGINNING;
+
+    // Reset TX buffer index
+    iot_tx = BEGINNING;
+
+    // Reset command assembly state
+    rx_char_count = BEGINNING;
+    command_ready = 0;
 }
 
 //==============================================================================

@@ -169,6 +169,10 @@ void main(void){
                 baud_rate_index = BEGINNING;
             }
 
+            // Flush all RX/TX buffer state before changing rates.
+            // Any bytes received at the old baud rate are now garbage — discard them.
+            Clear_Serial_Buffers();
+
             // Reinitialize UCA0 with the new rate (briefly puts UCA0 into reset)
             Init_Serial_UCA0(baud_rate_index);
 

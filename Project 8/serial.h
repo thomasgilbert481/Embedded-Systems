@@ -48,5 +48,6 @@ void Init_Serial_UCA0(unsigned char baud_index); // Initialize UCA0 at given bau
 void IOT_Process(void);                          // Drain ring buffer, assemble commands
 void Serial_Transmit(char *msg);                 // Load TX buffer and start ISR-driven TX
 void Update_Baud_Display(void);                  // Write baud rate string to LCD line 3
+void Clear_Serial_Buffers(void);                 // Flush RX/TX buffers before baud switch
 
 #endif /* SERIAL_H_ */
