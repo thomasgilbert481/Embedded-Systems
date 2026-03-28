@@ -7,10 +7,10 @@
 //     - Advances Time_Sequence counter
 //
 //   TIMER0_B1_ISR (CCR1/CCR2):
-//     - CCR1: SW1 debounce countdown — re-enables SW1 interrupt after
-//             DEBOUNCE_THRESHOLD × 200 ms (~1 second)
-//     - CCR2: SW2 debounce countdown — re-enables SW2 interrupt after
-//             DEBOUNCE_THRESHOLD × 200 ms (~1 second)
+//     - CCR1: SW1 debounce countdown -- re-enables SW1 interrupt after
+//             DEBOUNCE_THRESHOLD x 200 ms (~1 second)
+//     - CCR2: SW2 debounce countdown -- re-enables SW2 interrupt after
+//             DEBOUNCE_THRESHOLD x 200 ms (~1 second)
 //
 // Author: Thomas Gilbert
 // Date: Mar 2026
@@ -76,7 +76,7 @@ __interrupt void TIMER0_B1_ISR(void){
         case 0:                               // No pending interrupt
             break;
 
-        case 2:                               // CCR1 — SW1 debounce timer
+        case 2:                               // CCR1 -- SW1 debounce timer
             sw1_debounce_count++;
             if(sw1_debounce_count >= DEBOUNCE_THRESHOLD){
                 TB0CCTL1  &= ~CCIE;           // Disable CCR1 interrupt
@@ -86,7 +86,7 @@ __interrupt void TIMER0_B1_ISR(void){
             TB0CCR1 += TB0CCR1_INTERVAL;      // Re-arm CCR1 for next 200 ms
             break;
 
-        case 4:                               // CCR2 — SW2 debounce timer
+        case 4:                               // CCR2 -- SW2 debounce timer
             sw2_debounce_count++;
             if(sw2_debounce_count >= DEBOUNCE_THRESHOLD){
                 TB0CCTL2  &= ~CCIE;           // Disable CCR2 interrupt
@@ -96,7 +96,7 @@ __interrupt void TIMER0_B1_ISR(void){
             TB0CCR2 += TB0CCR2_INTERVAL;      // Re-arm CCR2 for next 200 ms
             break;
 
-        case 14:                              // Overflow — not used in Project 8
+        case 14:                              // Overflow -- not used in Project 8
             break;
 
         default:

@@ -5,16 +5,16 @@
 //              the PC (UCA1) and ESP32 IOT module (UCA0).
 //
 //              Data path:
-//                Termite (PC) → UCA1 RX ISR → UCA0 TXBUF → ESP32
-//                ESP32        → UCA0 RX ISR → UCA1 TXBUF → Termite (PC)
+//                Termite (PC) -> UCA1 RX ISR -> UCA0 TXBUF -> ESP32
+//                ESP32        -> UCA0 RX ISR -> UCA1 TXBUF -> Termite (PC)
 //
-//              UCA0 (IOT port — J9):
-//                P1.6 = UCA0RXD  (ESP32 TXD → Vehicle RX)
-//                P1.7 = UCA0TXD  (ESP32 RXD ← Vehicle TX)
+//              UCA0 (IOT port -- J9):
+//                P1.6 = UCA0RXD  (ESP32 TXD -> Vehicle RX)
+//                P1.7 = UCA0TXD  (ESP32 RXD <- Vehicle TX)
 //
 //              UCA1 (PC backchannel):
-//                P4.2 = UCA1RXD  (PC TX → Vehicle RX)
-//                P4.3 = UCA1TXD  (PC RX ← Vehicle TX)
+//                P4.2 = UCA1RXD  (PC TX -> Vehicle RX)
+//                P4.3 = UCA1TXD  (PC RX <- Vehicle TX)
 //
 // Author: Thomas Gilbert
 // Date: Mar 2026
@@ -28,7 +28,7 @@
 #include "serial.h"
 
 //==============================================================================
-// External globals (LCD display — defined in LCD.obj)
+// External globals (LCD display -- defined in LCD.obj)
 //==============================================================================
 extern char                  display_line[4][11]; // LCD line buffers
 extern volatile unsigned char display_changed;    // Set to signal LCD refresh
@@ -37,15 +37,15 @@ extern volatile unsigned char display_changed;    // Set to signal LCD refresh
 // Module global definitions (declared extern in serial.h)
 //==============================================================================
 
-// IOT ring buffer — filled by eUSCI_A0_ISR
+// IOT ring buffer -- filled by eUSCI_A0_ISR
 volatile char         IOT_Ring_Rx[IOT_RING_SIZE];
 volatile unsigned int iot_rx_wr = BEGINNING;
 
-// USB ring buffer — filled by eUSCI_A1_ISR
+// USB ring buffer -- filled by eUSCI_A1_ISR
 volatile char         USB_Ring_Rx[USB_RING_SIZE];
 volatile unsigned int usb_rx_wr = BEGINNING;
 
-// PC TX gate: blocks all FRAM→PC output until PC sends first character
+// PC TX gate: blocks all FRAM->PC output until PC sends first character
 volatile unsigned char pc_ok_to_tx = FALSE;
 
 // Main-loop read index for IOT ring buffer (non-volatile)
@@ -66,7 +66,7 @@ unsigned char baud_rate_index = BAUD_115200;       // Start at 115,200 baud for 
 static unsigned int rx_char_count = BEGINNING;
 
 //------------------------------------------------------------------------------
-// Init_Serial_UCA0 — IOT serial port (J9), P1.6=RXD, P1.7=TXD
+// Init_Serial_UCA0 -- IOT serial port (J9), P1.6=RXD, P1.7=TXD
 // speed: BAUD_115200 (0) or BAUD_9600 (1)
 //
 // Baud rate register values (SMCLK = 8 MHz):
@@ -97,7 +97,7 @@ void Init_Serial_UCA0(char speed){
 }
 
 //------------------------------------------------------------------------------
-// Init_Serial_UCA1 — PC backchannel, P4.2=RXD, P4.3=TXD
+// Init_Serial_UCA1 -- PC backchannel, P4.2=RXD, P4.3=TXD
 // speed: BAUD_115200 (0) or BAUD_9600 (1)
 //------------------------------------------------------------------------------
 void Init_Serial_UCA1(char speed){
@@ -220,8 +220,8 @@ void Clear_Serial_Buffers(void){
 }
 
 //------------------------------------------------------------------------------
-// eUSCI_A0_ISR — IOT serial port (J9)
-// RX: character arrived from ESP32 → store in ring buffer → forward to PC
+// eUSCI_A0_ISR -- IOT serial port (J9)
+// RX: character arrived from ESP32 -> store in ring buffer -> forward to PC
 // TX: not used in passthrough mode (polling TX used instead)
 //------------------------------------------------------------------------------
 #pragma vector = EUSCI_A0_VECTOR
@@ -231,7 +231,7 @@ __interrupt void eUSCI_A0_ISR(void){
   switch(__even_in_range(UCA0IV, 0x08)){
     case 0: break;                        // No interrupt
 
-    case 2:{                              // RX — character from ESP32
+    case 2:{                              // RX -- character from ESP32
       iot_receive = UCA0RXBUF;
 
       // Store in IOT ring buffer
@@ -247,15 +247,15 @@ __interrupt void eUSCI_A0_ISR(void){
       }
     }break;
 
-    case 4: break;                        // TX — not used in passthrough mode
+    case 4: break;                        // TX -- not used in passthrough mode
 
     default: break;
   }
 }
 
 //------------------------------------------------------------------------------
-// eUSCI_A1_ISR — PC backchannel
-// RX: character arrived from PC → passthrough to IOT (UCA0) → echo to PC
+// eUSCI_A1_ISR -- PC backchannel
+// RX: character arrived from PC -> passthrough to IOT (UCA0) -> echo to PC
 //------------------------------------------------------------------------------
 #pragma vector = EUSCI_A1_VECTOR
 __interrupt void eUSCI_A1_ISR(void){
@@ -264,7 +264,7 @@ __interrupt void eUSCI_A1_ISR(void){
   switch(__even_in_range(UCA1IV, 0x08)){
     case 0: break;                        // No interrupt
 
-    case 2:{                              // RX — character received from PC
+    case 2:{                              // RX -- character received from PC
       usb_value = UCA1RXBUF;
 
       // First character from PC unlocks bidirectional TX
@@ -279,7 +279,7 @@ __interrupt void eUSCI_A1_ISR(void){
       }
 
       // Passthrough: forward character to IOT (UCA0)
-      // Poll — character must go out before ISR exits
+      // Poll -- character must go out before ISR exits
       while(!(UCA0IFG & UCTXIFG));
       UCA0TXBUF = usb_value;
 
@@ -291,7 +291,7 @@ __interrupt void eUSCI_A1_ISR(void){
       }
     }break;
 
-    case 4:{                              // TX — not used in passthrough mode
+    case 4:{                              // TX -- not used in passthrough mode
     }break;
 
     default: break;

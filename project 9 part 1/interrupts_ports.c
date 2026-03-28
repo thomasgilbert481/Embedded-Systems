@@ -3,15 +3,15 @@
 // Description: Port interrupt service routines for Project 8.
 //
 //   switch1_interrupt (PORT4_VECTOR, SW1 = P4.1):
-//     Sets sw1_pressed flag → main loop calls Serial_Transmit(command_to_send)
+//     Sets sw1_pressed flag -> main loop calls Serial_Transmit(command_to_send)
 //     and updates LCD to "Transmit  ".
 //
 //   switch2_interrupt (PORT2_VECTOR, SW2 = P2.3):
-//     Sets sw2_pressed flag → main loop cycles baud rate and reinitializes UCA0.
+//     Sets sw2_pressed flag -> main loop cycles baud rate and reinitializes UCA0.
 //
 //   Both ISRs immediately disable their respective port interrupt and start the
 //   Timer B0 CCR1/CCR2 debounce countdown. TIMER0_B1_ISR (interrupts_timers.c)
-//   re-enables the port interrupt after DEBOUNCE_THRESHOLD × 200 ms (~1 second).
+//   re-enables the port interrupt after DEBOUNCE_THRESHOLD x 200 ms (~1 second).
 //
 // Author: Thomas Gilbert
 // Date: Mar 2026

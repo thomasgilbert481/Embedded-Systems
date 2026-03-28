@@ -1,6 +1,6 @@
 //==============================================================================
 // File Name: macros.h
-// Description: All #define constants for Project 9 Part 1 — IOT Passthrough
+// Description: All #define constants for Project 9 Part 1 -- IOT Passthrough
 // Author: Thomas Gilbert
 // Date: Mar 2026
 // Compiler: Code Composer Studio
@@ -23,7 +23,7 @@
 #define TEST_PROBE          (0x01)   // P3.0
 
 //------------------------------------------------------------------------------
-// Timer B0 — continuous mode, SMCLK/8/8 = 125 kHz
+// Timer B0 -- continuous mode, SMCLK/8/8 = 125 kHz
 //   25,000 counts = 200 ms per CCR0 interrupt
 //   5 interrupts = 1 second
 //------------------------------------------------------------------------------
@@ -32,15 +32,15 @@
 #define TB0CCR2_INTERVAL    (25000)  // SW2 debounce base period
 
 // Number of 200-ms CCR1/CCR2 ticks before re-enabling a switch interrupt
-// 5 × 200 ms = 1.0 second total debounce window
+// 5 x 200 ms = 1.0 second total debounce window
 #define DEBOUNCE_THRESHOLD  (5)
 
-// Time_Sequence wrap value (250 × 200 ms = 50 seconds)
+// Time_Sequence wrap value (250 x 200 ms = 50 seconds)
 #define TIME_SEQ_MAX        (250)
 
 // Timing aliases
-#define ONE_SEC             (5)      // 5 × 200 ms = 1 s
-#define TWO_SEC             (10)     // 10 × 200 ms = 2 s
+#define ONE_SEC             (5)      // 5 x 200 ms = 1 s
+#define TWO_SEC             (10)     // 10 x 200 ms = 2 s
 
 //------------------------------------------------------------------------------
 // Serial / UART Constants
@@ -83,12 +83,12 @@
 //--------------------------------------------------------------
 // IOT Control Pin Defines
 //--------------------------------------------------------------
-// P3.7 = IOT_EN  — active-low reset line
+// P3.7 = IOT_EN  -- active-low reset line
 #define IOT_EN_DIR      P3DIR
 #define IOT_EN_PORT     P3OUT
 #define IOT_EN_PIN      BIT7
 
-// P5.4 = IOT_BOOT — must stay HIGH always (never program mode)
+// P5.4 = IOT_BOOT -- must stay HIGH always (never program mode)
 #define IOT_BOOT_DIR    P5DIR
 #define IOT_BOOT_PORT   P5OUT
 #define IOT_BOOT_PIN    BIT4
@@ -104,7 +104,7 @@
 #define IOT_LINK_PIN    BIT6
 
 //--------------------------------------------------------------
-// IOT reset hold time (loop count ≈ 100ms at 8 MHz)
+// IOT reset hold time (loop count ~ 100ms at 8 MHz)
 //--------------------------------------------------------------
 #define IOT_RESET_DELAY (200000u)
 

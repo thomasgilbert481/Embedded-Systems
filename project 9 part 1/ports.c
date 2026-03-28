@@ -1,11 +1,11 @@
 //==============================================================================
 // File: ports.c
-// Description: Port initialization for Project 9 Part 1 — IOT Passthrough.
+// Description: Port initialization for Project 9 Part 1 -- IOT Passthrough.
 //              Configures all GPIO pins for the MSP430FR2355.
 //
 //              Key configuration:
 //                P1.6 (UCA0RXD) and P1.7 (UCA0TXD) configured as UART function
-//                  for eUSCI_A0 (IOT port / J9) — connected to ESP32.
+//                  for eUSCI_A0 (IOT port / J9) -- connected to ESP32.
 //                P4.2 (UCA1RXD) and P4.3 (UCA1TXD) configured as UART function
 //                  for eUSCI_A1 (PC backchannel).
 //                IOT control pins: P3.7 IOT_EN, P5.4 IOT_BOOT, P2.4 RUN, P3.6 LINK.
@@ -40,8 +40,8 @@ void Init_Ports(void){
 // P1.2: V_DETECT_L (ADC analog input)
 // P1.3: V_DETECT_R (ADC analog input)
 // P1.5: V_THUMB    (ADC analog input)
-// P1.6: UCA0RXD — UART function (SEL0=1, SEL1=0) for eUSCI_A0 IOT port
-// P1.7: UCA0TXD — UART function (SEL0=1, SEL1=0) for eUSCI_A0 IOT port
+// P1.6: UCA0RXD -- UART function (SEL0=1, SEL1=0) for eUSCI_A0 IOT port
+// P1.7: UCA0TXD -- UART function (SEL0=1, SEL1=0) for eUSCI_A0 IOT port
 //==============================================================================
 void Init_Port1(void){
     P1OUT = 0x00;
@@ -83,12 +83,12 @@ void Init_Port1(void){
     P1OUT  &= ~V_THUMB;
     P1DIR  &= ~V_THUMB;
 
-    // P1.6 -- UCA0RXD: eUSCI_A0 UART receive (IOT port — ESP32 TX)
+    // P1.6 -- UCA0RXD: eUSCI_A0 UART receive (IOT port -- ESP32 TX)
     // UART function: SEL0 = 1, SEL1 = 0
     P1SEL0 |=  UCA0RXD;
     P1SEL1 &= ~UCA0RXD;
 
-    // P1.7 -- UCA0TXD: eUSCI_A0 UART transmit (IOT port — ESP32 RX)
+    // P1.7 -- UCA0TXD: eUSCI_A0 UART transmit (IOT port -- ESP32 RX)
     // UART function: SEL0 = 1, SEL1 = 0
     P1SEL0 |=  UCA0TXD;
     P1SEL1 &= ~UCA0TXD;
@@ -99,7 +99,7 @@ void Init_Port1(void){
 // P2.2: IR_LED (GPIO output, OFF at startup)
 // P2.3: SW2 (GPIO input, pull-up, interrupt enabled)
 // P2.4: IOT_RUN LED (GPIO output, OFF at startup)
-// P2.5: DAC_ENB (GPIO output, LOW — buck-boost disabled)
+// P2.5: DAC_ENB (GPIO output, LOW -- buck-boost disabled)
 // P2.6-P2.7: LFXOUT/LFXIN (crystal function)
 //==============================================================================
 void Init_Port2(void){
@@ -137,7 +137,7 @@ void Init_Port2(void){
     IOT_RUN_DIR  |=  IOT_RUN_PIN;
     IOT_RUN_PORT &= ~IOT_RUN_PIN;
 
-    // P2.5 -- DAC_ENB (GPIO output, LOW — buck-boost stays disabled)
+    // P2.5 -- DAC_ENB (GPIO output, LOW -- buck-boost stays disabled)
     P2SEL0 &= ~DAC_ENB;
     P2SEL1 &= ~DAC_ENB;
     P2OUT  &= ~DAC_ENB;
@@ -159,7 +159,7 @@ void Init_Port2(void){
 // Function: Init_Port3
 // P3.0: TEST_PROBE (GPIO output, oscilloscope heartbeat)
 // P3.6: IOT_LINK LED (GPIO output, OFF at startup)
-// P3.7: IOT_EN (GPIO output, start LOW — holds ESP32 in reset)
+// P3.7: IOT_EN (GPIO output, start LOW -- holds ESP32 in reset)
 //==============================================================================
 void Init_Port3(void){
     P3OUT = 0x00;
@@ -216,8 +216,8 @@ void Init_Port3(void){
 // Function: Init_Port4
 // P4.0: RESET_LCD (GPIO output)
 // P4.1: SW1 (GPIO input, pull-up, interrupt)
-// P4.2: UCA1RXD — UART function (SEL0=1, SEL1=0) for eUSCI_A1 PC backchannel
-// P4.3: UCA1TXD — UART function (SEL0=1, SEL1=0) for eUSCI_A1 PC backchannel
+// P4.2: UCA1RXD -- UART function (SEL0=1, SEL1=0) for eUSCI_A1 PC backchannel
+// P4.3: UCA1TXD -- UART function (SEL0=1, SEL1=0) for eUSCI_A1 PC backchannel
 // P4.4-P4.7: SPI for LCD (UCB1)
 //==============================================================================
 void Init_Port4(void){
@@ -273,7 +273,7 @@ void Init_Port4(void){
 
 //==============================================================================
 // Function: Init_Port5
-// P5.4: IOT_BOOT — Output, always HIGH (never program mode)
+// P5.4: IOT_BOOT -- Output, always HIGH (never program mode)
 //==============================================================================
 void Init_Port5(void){
     P5OUT = 0x00;
@@ -299,7 +299,7 @@ void Init_Port5(void){
     P5OUT  &= ~V_3_3;
     P5DIR  &= ~V_3_3;
 
-    // P5.4 -- IOT_BOOT: Output, always HIGH — NEVER change this pin again
+    // P5.4 -- IOT_BOOT: Output, always HIGH -- NEVER change this pin again
     P5SEL0 &= ~IOT_BOOT_CPU;
     P5SEL1 &= ~IOT_BOOT_CPU;
     P5OUT  |=  IOT_BOOT_CPU;
@@ -311,7 +311,7 @@ void Init_Port5(void){
 //==============================================================================
 // Function: Init_Port6
 // P6.0: LCD_BACKLITE (GPIO output)
-// P6.1-P6.4: Motor pins — GPIO outputs LOW (no PWM)
+// P6.1-P6.4: Motor pins -- GPIO outputs LOW (no PWM)
 // P6.6: GRN_LED (GPIO output)
 //==============================================================================
 void Init_Port6(void){
