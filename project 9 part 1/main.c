@@ -1,11 +1,11 @@
 //==============================================================================
 // File: main.c
-// Description: Main routine for Project 9 Part 1 — IOT Passthrough.
+// Description: Main routine for Project 9 Part 1 -- IOT Passthrough.
 //
-//   Transparent serial bridge: Termite (PC) ↔ MSP430 ↔ ESP32 IOT module.
+//   Transparent serial bridge: Termite (PC) <-> MSP430 <-> ESP32 IOT module.
 //   Data path:
-//     Termite (PC) → UCA1 RX ISR → UCA0 TXBUF → ESP32
-//     ESP32        → UCA0 RX ISR → UCA1 TXBUF → Termite (PC)
+//     Termite (PC) -> UCA1 RX ISR -> UCA0 TXBUF -> ESP32
+//     ESP32        -> UCA0 RX ISR -> UCA1 TXBUF -> Termite (PC)
 //
 //   No state machine, no IOT_Process drain, no movement commands.
 //   Main loop is unchanged from Project 8 except for initialization.
@@ -63,18 +63,19 @@ void main(void){
     Init_Timers();            // Timer B0: 200 ms CCR0 base clock + debounce CCR1/CCR2
     Init_LCD();               // Initialize LCD via SPI (UCB1)
 
-    // 1. Init UCA1 first (PC backchannel) — this resets pc_ok_to_tx to FALSE
+    // 1. Init UCA1 first (PC backchannel) -- this resets pc_ok_to_tx to FALSE
     Init_Serial_UCA1(BAUD_115200);
 
-    // 2. Init UCA0 (IOT port) — P1.6/P1.7 must already be configured in Init_Ports()
+    // 2. Init UCA0 (IOT port) -- P1.6/P1.7 must already be configured in Init_Ports()
     Init_Serial_UCA0(BAUD_115200);
 
-    // 3. Release IOT from reset — must happen AFTER both serial ports are initialized
+    // 3. Release IOT from reset -- must happen AFTER both serial ports are initialized
     {
       volatile unsigned long dly;
       IOT_EN_PORT &= ~IOT_EN_PIN;           // Ensure IOT_EN is LOW first
       for(dly = IOT_RESET_DELAY; dly > 0; dly--);  // Hold LOW >= 100ms
-      IOT_EN_PORT |=  IOT_EN_PIN;           // Release reset — ESP32 boots
+      IOT_EN_PORT |=  IOT_EN_PIN;           // Release reset -- ESP32 boots
+      P1OUT |= RED_LED;                      // DEBUG: RED ON = IOT_EN released
     }
 
     // LCD backlight ON
@@ -122,7 +123,7 @@ void main(void){
         }
 
         //----------------------------------------------------------------------
-        // SW1 pressed — transmit stored command
+        // SW1 pressed -- transmit stored command
         //----------------------------------------------------------------------
         if(sw1_pressed){
             sw1_pressed = RESET_STATE;
@@ -145,7 +146,7 @@ void main(void){
         }
 
         //----------------------------------------------------------------------
-        // SW2 pressed — cycle baud rate (kept from Project 8)
+        // SW2 pressed -- cycle baud rate (kept from Project 8)
         //----------------------------------------------------------------------
         if(sw2_pressed){
             sw2_pressed = RESET_STATE;

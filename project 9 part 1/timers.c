@@ -1,10 +1,10 @@
 //==============================================================================
 // File: timers.c
-// Description: Timer initialization for Project 8 — Serial Communication.
+// Description: Timer initialization for Project 8 -- Serial Communication.
 //              Configures Timer B0 in continuous mode for:
-//                CCR0 — 200 ms display update tick
-//                CCR1 — SW1 interrupt-driven debounce
-//                CCR2 — SW2 interrupt-driven debounce
+//                CCR0 -- 200 ms display update tick
+//                CCR1 -- SW1 interrupt-driven debounce
+//                CCR2 -- SW2 interrupt-driven debounce
 //
 //              No Timer B3 (no motor PWM needed in Project 8).
 //
@@ -39,9 +39,9 @@ void Init_Timers(void){
 //==============================================================================
 // Function: Init_Timer_B0
 // Description: Configures Timer B0 in continuous mode.
-//   CCR0 — 200 ms period for display update
-//   CCR1 — SW1 debounce (started on button press by ISR)
-//   CCR2 — SW2 debounce (started on button press by ISR)
+//   CCR0 -- 200 ms period for display update
+//   CCR1 -- SW1 debounce (started on button press by ISR)
+//   CCR2 -- SW2 debounce (started on button press by ISR)
 //
 //   Timer source:    SMCLK = 8 MHz
 //   ID divider:      /8
@@ -56,22 +56,22 @@ void Init_Timer_B0(void){
     TB0EX0  = TBIDEX__8;          // Additional divider: /8
     TB0CTL |= TBCLR;              // Clear TB0R and dividers
 
-    // CCR0 — Display update (200 ms)
+    // CCR0 -- Display update (200 ms)
     TB0CCR0  = TB0CCR0_INTERVAL;
     TB0CCTL0 &= ~CCIFG;
     TB0CCTL0 |=  CCIE;
 
-    // CCR1 — SW1 debounce (disabled until SW1 pressed)
+    // CCR1 -- SW1 debounce (disabled until SW1 pressed)
     TB0CCR1  = TB0CCR1_INTERVAL;
     TB0CCTL1 &= ~CCIFG;
     TB0CCTL1 &= ~CCIE;
 
-    // CCR2 — SW2 debounce (disabled until SW2 pressed)
+    // CCR2 -- SW2 debounce (disabled until SW2 pressed)
     TB0CCR2  = TB0CCR2_INTERVAL;
     TB0CCTL2 &= ~CCIFG;
     TB0CCTL2 &= ~CCIE;
 
-    // Overflow — not used in Project 8
+    // Overflow -- not used in Project 8
     TB0CTL &= ~TBIE;
     TB0CTL &= ~TBIFG;
 }

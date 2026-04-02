@@ -1,6 +1,6 @@
 //==============================================================================
 // File: functions.h
-// Description: Function prototypes for Project 9 Part 1 — IOT Passthrough
+// Description: Function prototypes for Project 9 Part 1 -- IOT Passthrough
 // Author: Thomas Gilbert
 // Date: Mar 2026
 // Compiler: Code Composer Studio
@@ -21,8 +21,8 @@ __interrupt void Timer0_B0_ISR(void);   // CCR0: 200 ms display update tick
 __interrupt void TIMER0_B1_ISR(void);   // CCR1/CCR2: SW1/SW2 debounce timers
 
 // Port ISRs (interrupt_ports.c)
-__interrupt void switch1_interrupt(void); // PORT4_VECTOR: SW1 (P4.1) — transmit
-__interrupt void switch2_interrupt(void); // PORT2_VECTOR: SW2 (P2.3) — baud cycle
+__interrupt void switch1_interrupt(void); // PORT4_VECTOR: SW1 (P4.1) -- transmit
+__interrupt void switch2_interrupt(void); // PORT2_VECTOR: SW2 (P2.3) -- baud cycle
 
 // Debounce counters (defined in interrupts_timers.c)
 extern volatile unsigned int sw1_debounce_count;
@@ -31,7 +31,7 @@ extern volatile unsigned int sw2_debounce_count;
 // Clocks
 void Init_Clocks(void);
 
-// LCD (from LCD.obj — Carlson's library)
+// LCD (from LCD.obj -- Carlson's library)
 void Display_Process(void);
 void Display_Update(char p_L1, char p_L2, char p_L3, char p_L4);
 void enable_display_update(void);
@@ -94,7 +94,7 @@ void Init_Timers(void);
 void Init_Timer_B0(void);
 
 // Serial communication (serial.c / serial.h)
-// (prototypes also in serial.h — include either header)
+// (prototypes also in serial.h -- include either header)
 void Init_Serial_UCA0(char speed);
 void Init_Serial_UCA1(char speed);
 void IOT_Process(void);

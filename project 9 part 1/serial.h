@@ -1,7 +1,7 @@
 //==============================================================================
 // File:        serial.h
 // Description: Declarations for UCA0 and UCA1 serial communication
-//              (Project 9 Part 1 — IOT Passthrough).
+//              (Project 9 Part 1 -- IOT Passthrough).
 //              UCA0 is connected to J9 (IOT connector) for ESP32 communication.
 //                P1.6 = UCA0RXD (receive from ESP32)
 //                P1.7 = UCA0TXD (transmit to ESP32)
@@ -22,19 +22,19 @@
 #include "macros.h"
 
 //==============================================================================
-// IOT ring buffer (UCA0 receive path — ESP32 → FRAM)
+// IOT ring buffer (UCA0 receive path -- ESP32 -> FRAM)
 //==============================================================================
 extern volatile char         IOT_Ring_Rx[IOT_RING_SIZE];
 extern volatile unsigned int iot_rx_wr;
 
 //==============================================================================
-// USB ring buffer (UCA1 receive path — PC → FRAM)
+// USB ring buffer (UCA1 receive path -- PC -> FRAM)
 //==============================================================================
 extern volatile char         USB_Ring_Rx[USB_RING_SIZE];
 extern volatile unsigned int usb_rx_wr;
 
 //==============================================================================
-// PC TX gate — FALSE until PC sends first character
+// PC TX gate -- FALSE until PC sends first character
 //==============================================================================
 extern volatile unsigned char pc_ok_to_tx;
 
