@@ -75,6 +75,7 @@ void main(void){
       IOT_EN_PORT &= ~IOT_EN_PIN;           // Ensure IOT_EN is LOW first
       for(dly = IOT_RESET_DELAY; dly > 0; dly--);  // Hold LOW >= 100ms
       IOT_EN_PORT |=  IOT_EN_PIN;           // Release reset -- ESP32 boots
+      P1OUT |= RED_LED;                      // DEBUG: RED ON = IOT_EN released
     }
 
     // LCD backlight ON

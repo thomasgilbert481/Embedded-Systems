@@ -233,6 +233,7 @@ __interrupt void eUSCI_A0_ISR(void){
 
     case 2:{                              // RX -- character from ESP32
       iot_receive = UCA0RXBUF;
+      P6OUT ^= GRN_LED;                  // DEBUG: toggle GRN every ESP32 byte
 
       // Store in IOT ring buffer
       IOT_Ring_Rx[iot_rx_wr++] = iot_receive;
