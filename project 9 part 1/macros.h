@@ -79,6 +79,14 @@
 #define SERIAL_CR           (0x0D)   // Carriage return
 #define SERIAL_LF           (0x0A)   // Line feed
 #define SERIAL_NULL         (0x00)   // Null terminator
+#define SERIAL_CARET        (0x5E)   // '^' -- FRAM-only command prefix
+
+//------------------------------------------------------------------------------
+// FRAM command characters (used after the '^' prefix in UCA1 RX ISR)
+//------------------------------------------------------------------------------
+#define FRAM_CMD_PING       ('^')    // ^^  -> FRAM responds "I'm here"
+#define FRAM_CMD_FAST       ('F')    // ^F  -> switch UCA0 to 115,200 baud
+#define FRAM_CMD_SLOW       ('S')    // ^S  -> switch UCA0 to 9,600 baud
 
 //--------------------------------------------------------------
 // IOT Control Pin Defines

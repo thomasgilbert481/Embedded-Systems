@@ -62,6 +62,7 @@ void Init_Serial_UCA0(char speed);
 void Init_Serial_UCA1(char speed);
 void IOT_Process(void);
 void Serial_Transmit(char *msg);
+void USB_transmit_string(const char *str);
 void Update_Baud_Display(void);
 void Clear_Serial_Buffers(void);
 

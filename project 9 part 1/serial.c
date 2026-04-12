@@ -187,6 +187,23 @@ void Serial_Transmit(char *msg){
 }
 
 //==============================================================================
+// Function: USB_transmit_string
+// Description: Transmit a null-terminated string to the PC via UCA1 (polled).
+//              Respects the pc_ok_to_tx gate -- silently drops the string if
+//              the PC has not yet sent its first character.
+//==============================================================================
+void USB_transmit_string(const char *str){
+    unsigned int i = BEGINNING;
+    if(!pc_ok_to_tx){
+        return;
+    }
+    while(str[i] != SERIAL_NULL){
+        while(!(UCA1IFG & UCTXIFG));   // Wait for TX buffer empty
+        UCA1TXBUF = str[i++];
+    }
+}
+
+//==============================================================================
 // Function: Update_Baud_Display
 //==============================================================================
 void Update_Baud_Display(void){
@@ -248,7 +265,14 @@ __interrupt void eUSCI_A0_ISR(void){
       }
     }break;
 
-    case 4: break;                        // TX -- not used in passthrough mode
+    case 4:{                              // TX -- drain iot_TX_buf to ESP32
+      if(iot_TX_buf[iot_tx] != SERIAL_NULL){
+        UCA0TXBUF = iot_TX_buf[iot_tx++];
+      } else {
+        UCA0IE &= ~UCTXIE;                // Buffer exhausted, disable TX IE
+        iot_tx  = BEGINNING;
+      }
+    }break;
 
     default: break;
   }
@@ -256,8 +280,16 @@ __interrupt void eUSCI_A0_ISR(void){
 
 //------------------------------------------------------------------------------
 // eUSCI_A1_ISR -- PC backchannel
-// RX: character arrived from PC -> passthrough to IOT (UCA0) -> echo to PC
+// RX: character arrived from PC.
+//     - First byte unlocks pc_ok_to_tx (PC->FRAM gate).
+//     - If byte is '^', start collecting a FRAM-only command (^^, ^F, ^S);
+//       these are consumed by the FRAM and NEVER forwarded to the ESP32.
+//     - Otherwise, passthrough to IOT (UCA0) and echo to PC.
+// TX: not used in passthrough mode (polling TX used instead).
 //------------------------------------------------------------------------------
+// Module-scope state for FRAM '^' command assembly
+static volatile unsigned char fram_cmd_active = FALSE;
+
 #pragma vector = EUSCI_A1_VECTOR
 __interrupt void eUSCI_A1_ISR(void){
   char usb_value;
@@ -273,27 +305,70 @@ __interrupt void eUSCI_A1_ISR(void){
         pc_ok_to_tx = TRUE;
       }
 
-      // Store in USB ring buffer
+      // Store in USB ring buffer (bookkeeping, not required for passthrough)
       USB_Ring_Rx[usb_rx_wr++] = usb_value;
       if(usb_rx_wr >= USB_RING_SIZE){
         usb_rx_wr = BEGINNING;
       }
 
-      // Passthrough: forward character to IOT (UCA0)
-      // Poll -- character must go out before ISR exits
+      //----------------------------------------------------------------------
+      // FRAM command detection: '^' prefix.
+      // ^^ -> FRAM responds "I'm here"
+      // ^F -> switch UCA0 to 115,200 baud
+      // ^S -> switch UCA0 to   9,600 baud
+      // These bytes are consumed by the FRAM and NOT forwarded to the ESP32.
+      //----------------------------------------------------------------------
+      if(usb_value == SERIAL_CARET){
+        fram_cmd_active = TRUE;
+        // Echo the '^' so the operator sees it in Termite
+        while(!(UCA1IFG & UCTXIFG));
+        UCA1TXBUF = usb_value;
+        break;                            // Do NOT forward '^' to ESP32
+      }
+
+      if(fram_cmd_active){
+        fram_cmd_active = FALSE;
+        // Echo the command character to Termite
+        while(!(UCA1IFG & UCTXIFG));
+        UCA1TXBUF = usb_value;
+
+        switch(usb_value){
+          case FRAM_CMD_PING:
+            USB_transmit_string("\r\nI'm here\r\n");
+            break;
+          case FRAM_CMD_FAST:
+            Clear_Serial_Buffers();
+            Init_Serial_UCA0(BAUD_115200);
+            baud_rate_index = BAUD_115200;
+            Update_Baud_Display();
+            USB_transmit_string("\r\nUCA0: 115,200\r\n");
+            break;
+          case FRAM_CMD_SLOW:
+            Clear_Serial_Buffers();
+            Init_Serial_UCA0(BAUD_9600);
+            baud_rate_index = BAUD_9600;
+            Update_Baud_Display();
+            USB_transmit_string("\r\nUCA0: 9,600\r\n");
+            break;
+          default:
+            // Unknown ^ command -- ignore, do NOT forward to ESP32
+            break;
+        }
+        break;                            // FRAM command handled, do not forward
+      }
+
+      //----------------------------------------------------------------------
+      // Normal passthrough: forward character to IOT (UCA0)
+      //----------------------------------------------------------------------
       while(!(UCA0IFG & UCTXIFG));
       UCA0TXBUF = usb_value;
 
       // Echo back to PC so operator sees what they typed
-      // Only echo if UCA1 TX buffer is ready
-      if(pc_ok_to_tx){
-        while(!(UCA1IFG & UCTXIFG));
-        UCA1TXBUF = usb_value;
-      }
+      while(!(UCA1IFG & UCTXIFG));
+      UCA1TXBUF = usb_value;
     }break;
 
-    case 4:{                              // TX -- not used in passthrough mode
-    }break;
+    case 4: break;                        // TX -- not used in passthrough mode
 
     default: break;
   }
