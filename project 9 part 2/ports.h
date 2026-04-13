@@ -5,22 +5,22 @@
 //------------------------------------------------------------------------------
 // Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins.
 //
-// EMPIRICAL MAPPING for this car (verified via F/B/R/L TCP tests):
-//   P6.1 = NOT ROUTED to any H-bridge input (TB3CCR1 ignored by PCB)
-//   P6.2 = LEFT  FORWARD  --> TB3CCR2
-//   P6.3 = RIGHT FORWARD  --> TB3CCR3   (NOT right reverse as labeled)
-//   P6.4 = LEFT  REVERSE  --> TB3CCR4
-//   P6.5 = RIGHT REVERSE  --> TB3CCR5   (the only remaining TB3 PWM pin)
+// Mapping aligned with the working reference implementation used by the
+// NProject 9 car kit (Noah Cartwright's code):
+//   TB3CCR1 --> P6.1  (unused on this car; LCD-backlight-dimming on some boards)
+//   TB3CCR2 --> P6.2  RIGHT FORWARD
+//   TB3CCR3 --> P6.3  LEFT  FORWARD
+//   TB3CCR4 --> P6.4  RIGHT REVERSE
+//   TB3CCR5 --> P6.5  LEFT  REVERSE
 //
-// The R_FORWARD / R_REVERSE Port-6-bit names in this file still reflect the
-// schematic labels; only the speed macros below are remapped so that calling
-// Forward_On()/Reverse_On()/Spin_*_On() drive the correct directions on
-// THIS car.
+// NOTE: P6.5 must be selected as TB3 function (SEL0=1) in Init_Port6 for the
+// LEFT_REVERSE PWM to actually drive the pin -- the reference code leaves
+// P6.5 as GPIO input, which is a latent bug there.
 //------------------------------------------------------------------------------
-#define RIGHT_FORWARD_SPEED (TB3CCR3)  // P6.3 (empirically right forward)
-#define LEFT_FORWARD_SPEED  (TB3CCR2)  // P6.2 L_FORWARD
-#define RIGHT_REVERSE_SPEED (TB3CCR5)  // P6.5 (TB3.5 drives right reverse)
-#define LEFT_REVERSE_SPEED  (TB3CCR4)  // P6.4 L_REVERSE
+#define RIGHT_FORWARD_SPEED (TB3CCR2)  // P6.2
+#define LEFT_FORWARD_SPEED  (TB3CCR3)  // P6.3
+#define RIGHT_REVERSE_SPEED (TB3CCR4)  // P6.4
+#define LEFT_REVERSE_SPEED  (TB3CCR5)  // P6.5
 
 // Port 1 Pins
 #define RED_LED     (0x01) // P1.0 - Red LED

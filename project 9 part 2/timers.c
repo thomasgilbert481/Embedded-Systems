@@ -50,28 +50,27 @@ void Init_Timer_B3(void){
     TB3CTL |= MC__UP;                 // Up mode: count 0 -> TB3CCR0
     TB3CTL |= TBCLR;                  // Clear timer counter and dividers
 
-    TB3CCR0 = WHEEL_PERIOD_VAL;       // PWM period
+    TB3CCR0 = WHEEL_PERIOD_VAL;       // PWM period (50000 on the reference car)
 
-    // CCR1 (P6.1) -- not wired to any H-bridge on this PCB; still configured
-    // as OUTMOD_7 for consistency and kept at WHEEL_OFF.
-    TB3CCTL1 = OUTMOD_7;              // P6.1 (unused on this car)
+    // CCR1 (P6.1) -- unused for motors on this car; kept LOW via OUTMOD_7 + 0.
+    TB3CCTL1 = OUTMOD_7;
     TB3CCR1  = WHEEL_OFF;
 
-    // CCR2 (P6.2) -- LEFT_FORWARD
+    // CCR2 (P6.2) -- RIGHT_FORWARD
     TB3CCTL2 = OUTMOD_7;
-    LEFT_FORWARD_SPEED  = WHEEL_OFF;
-
-    // CCR3 (P6.3) -- RIGHT_FORWARD (empirical)
-    TB3CCTL3 = OUTMOD_7;
     RIGHT_FORWARD_SPEED = WHEEL_OFF;
 
-    // CCR4 (P6.4) -- LEFT_REVERSE
-    TB3CCTL4 = OUTMOD_7;
-    LEFT_REVERSE_SPEED  = WHEEL_OFF;
+    // CCR3 (P6.3) -- LEFT_FORWARD
+    TB3CCTL3 = OUTMOD_7;
+    LEFT_FORWARD_SPEED  = WHEEL_OFF;
 
-    // CCR5 (P6.5) -- RIGHT_REVERSE on this car (TB3.5 PWM)
-    TB3CCTL5 = OUTMOD_7;
+    // CCR4 (P6.4) -- RIGHT_REVERSE
+    TB3CCTL4 = OUTMOD_7;
     RIGHT_REVERSE_SPEED = WHEEL_OFF;
+
+    // CCR5 (P6.5) -- LEFT_REVERSE
+    TB3CCTL5 = OUTMOD_7;
+    LEFT_REVERSE_SPEED  = WHEEL_OFF;
 }
 
 //==============================================================================

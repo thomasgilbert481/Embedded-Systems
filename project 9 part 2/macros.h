@@ -171,7 +171,7 @@
 //   FOLLOW_SPEED      drive duty   ~ 50%
 //   SPIN_SPEED        spin duty    ~ 50%
 //------------------------------------------------------------------------------
-#define WHEEL_PERIOD_VAL    (50005)
+#define WHEEL_PERIOD_VAL    (50000)   // Aligned with reference car (was 50005)
 #define FOLLOW_SPEED        (25000)
 #define SPIN_SPEED          (25000)
 
