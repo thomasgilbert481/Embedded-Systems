@@ -52,17 +52,26 @@ void Init_Timer_B3(void){
 
     TB3CCR0 = WHEEL_PERIOD_VAL;       // PWM period
 
-    TB3CCTL1 = OUTMOD_7;              // R_FORWARD (P6.1)
-    RIGHT_FORWARD_SPEED = WHEEL_OFF;
+    // CCR1 (P6.1) -- not wired to any H-bridge on this PCB; still configured
+    // as OUTMOD_7 for consistency and kept at WHEEL_OFF.
+    TB3CCTL1 = OUTMOD_7;              // P6.1 (unused on this car)
+    TB3CCR1  = WHEEL_OFF;
 
-    TB3CCTL2 = OUTMOD_7;              // L_FORWARD (P6.2)
+    // CCR2 (P6.2) -- LEFT_FORWARD
+    TB3CCTL2 = OUTMOD_7;
     LEFT_FORWARD_SPEED  = WHEEL_OFF;
 
-    TB3CCTL3 = OUTMOD_7;              // R_REVERSE (P6.3)
-    RIGHT_REVERSE_SPEED = WHEEL_OFF;
+    // CCR3 (P6.3) -- RIGHT_FORWARD (empirical)
+    TB3CCTL3 = OUTMOD_7;
+    RIGHT_FORWARD_SPEED = WHEEL_OFF;
 
-    TB3CCTL4 = OUTMOD_7;              // L_REVERSE (P6.4)
+    // CCR4 (P6.4) -- LEFT_REVERSE
+    TB3CCTL4 = OUTMOD_7;
     LEFT_REVERSE_SPEED  = WHEEL_OFF;
+
+    // CCR5 (P6.5) -- RIGHT_REVERSE on this car (TB3.5 PWM)
+    TB3CCTL5 = OUTMOD_7;
+    RIGHT_REVERSE_SPEED = WHEEL_OFF;
 }
 
 //==============================================================================
