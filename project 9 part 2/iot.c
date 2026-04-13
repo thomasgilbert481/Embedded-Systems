@@ -238,6 +238,10 @@ void IOT_State_Machine(void){
                     break;
                 }
 
+                USB_transmit_string("IP=");
+                USB_transmit_string(car_ip);
+                USB_transmit_string("\r\n");
+
                 Display_Network_Info();
                 iot_state = IOT_STATE_RUNNING;
                 break;
