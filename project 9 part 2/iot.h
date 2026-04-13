@@ -31,6 +31,7 @@ extern volatile unsigned int  cmd_active_time;    // original time-units value
 void IOT_State_Machine(void);
 void Parse_IPD_Command(char *line);
 void Display_Network_Info(void);
-void Vehicle_Cmd_Tick(void);   // Called from Timer B0 CCR0 ISR every 200 ms
+void Vehicle_Cmd_Tick(void);       // Timer B0 CCR0 ISR every 200 ms
+void Process_Vehicle_Queue(void);  // Main loop -- starts next queued cmd
 
 #endif /* IOT_H_ */
