@@ -118,3 +118,6 @@ void IOT_State_Machine(void);
 void Parse_IPD_Command(char *line);
 void Display_Network_Info(void);
 void Vehicle_Cmd_Tick(void);   // Called from Timer B0 CCR0 ISR every 200 ms
+
+// DAC (dac.c) -- sets up buck-boost motor supply rail
+void Init_DAC(void);

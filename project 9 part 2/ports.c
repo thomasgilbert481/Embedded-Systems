@@ -137,11 +137,12 @@ void Init_Port2(void){
     IOT_RUN_DIR  |=  IOT_RUN_PIN;
     IOT_RUN_PORT &= ~IOT_RUN_PIN;
 
-    // P2.5 -- DAC_ENB: HIGH = buck-boost enabled (motor 5V rail ON).
-    // In P9P2 we need motor power immediately; no DAC ramp sequence.
+    // P2.5 -- DAC_ENB: LOW at startup; TB0 overflow ISR drives it HIGH after
+    //                    DAC_ENABLE_TICKS have elapsed (lets DAC output settle
+    //                    before the buck-boost converter sees it).
     P2SEL0 &= ~DAC_ENB;
     P2SEL1 &= ~DAC_ENB;
-    P2OUT  |=  DAC_ENB;             // HIGH -> motor supply ON
+    P2OUT  &= ~DAC_ENB;
     P2DIR  |=  DAC_ENB;
 
     // P2.6-P2.7 -- LFXOUT/LFXIN (crystal function)
@@ -343,11 +344,11 @@ void Init_Port6(void){
     P6SEL1 &= ~L_REVERSE;
     P6DIR  |=  L_REVERSE;
 
-    // P6.5 -- unused GPIO input
-    P6SEL0 &= ~P6_5;
+    // P6.5 -- RIGHT_REVERSE on this car: Timer B3.5 PWM output (SEL0=1, SEL1=0)
+    // (P6.1 / TB3.1 is not routed on this PCB, so TB3.5 / P6.5 fills in.)
+    P6SEL0 |=  P6_5;
     P6SEL1 &= ~P6_5;
-    P6OUT  &= ~P6_5;
-    P6DIR  &= ~P6_5;
+    P6DIR  |=  P6_5;
 
     // P6.6 -- GRN_LED (GPIO output)
     P6SEL0 &= ~GRN_LED;

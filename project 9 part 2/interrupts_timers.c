@@ -39,6 +39,10 @@ extern volatile char         one_time;
 // From LCD.obj
 extern volatile unsigned char update_display;
 
+// From dac.c
+extern volatile unsigned int DAC_data;
+extern volatile unsigned int dac_startup_ticks;
+
 //==============================================================================
 // ISR: Timer0_B0_ISR
 // Fires every 200 ms. Sets update_display flag and advances Time_Sequence.
@@ -99,7 +103,34 @@ __interrupt void TIMER0_B1_ISR(void){
             TB0CCR2 += TB0CCR2_INTERVAL;      // Re-arm CCR2 for next 200 ms
             break;
 
-        case 14:                              // Overflow -- not used in Project 8
+        case 14:                              // Timer overflow -- DAC enable + ramp
+            // Phase 1: wait DAC_ENABLE_TICKS overflows before enabling buck-boost.
+            //   This lets the DAC output settle before the LT1935 sees it.
+            // Phase 2: decrement DAC_data by DAC_RAMP_STEP each tick.
+            //   Lower DAC value = higher motor supply voltage (inverted).
+            //   Stop when DAC_data <= DAC_Limit: set DAC_Adjust, clear TBIE.
+            if(!(P2OUT & DAC_ENB)){
+                // Phase 1 -- settling delay
+                dac_startup_ticks++;
+                if(dac_startup_ticks >= DAC_ENABLE_TICKS){
+                    P2OUT |= DAC_ENB;         // Enable buck-boost converter
+                    P1OUT |= RED_LED;         // RED LED ON -- ramp starting
+                }
+            } else {
+                // Phase 2 -- ramp down toward motor operating voltage
+                if(DAC_data >= (DAC_Limit + DAC_RAMP_STEP)){
+                    DAC_data -= DAC_RAMP_STEP;
+                } else {
+                    DAC_data = DAC_Adjust;
+                }
+                SAC3DAT = DAC_data;
+                if(DAC_data <= DAC_Limit){
+                    DAC_data = DAC_Adjust;
+                    SAC3DAT  = DAC_data;
+                    TB0CTL  &= ~TBIE;         // Disable overflow interrupt
+                    P1OUT   &= ~RED_LED;      // RED LED OFF -- ramp done
+                }
+            }
             break;
 
         default:

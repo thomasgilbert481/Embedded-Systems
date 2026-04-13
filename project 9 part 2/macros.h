@@ -190,4 +190,17 @@
 //------------------------------------------------------------------------------
 #define IOT_TCP_PORT        (8181)
 
+//------------------------------------------------------------------------------
+// DAC -> LT1935 buck-boost operating points (ported from Project 7).
+// Output is INVERTED: lower SAC3DAT -> higher motor supply voltage.
+//   DAC_Begin  (1500) --> ~1.21V DAC out --> low motor voltage, safe start
+//   DAC_Limit  (1200) --> ~0.97V DAC out --> ~6V motor supply (ramp stops)
+//   DAC_Adjust (1200) --> same as DAC_Limit -- final operating point
+//------------------------------------------------------------------------------
+#define DAC_Begin           (1500)
+#define DAC_Limit           (1200)
+#define DAC_Adjust          (1200)
+#define DAC_RAMP_STEP       (50)
+#define DAC_ENABLE_TICKS    (3)
+
 #endif /* MACROS_H_ */

@@ -57,6 +57,7 @@ void main(void){
     Init_Conditions();         // Clear display buffers + global IE
     Init_Timers();             // Timer B0 (200 ms) + Timer B3 (motor PWM)
     Init_LCD();                // SPI LCD init
+    Init_DAC();                // SAC3 DAC -> LT1935 buck-boost -> motor 6V rail
 
     // 1. UCA1 (PC backchannel) -- resets pc_ok_to_tx to FALSE
     Init_Serial_UCA1(BAUD_115200);
