@@ -3,15 +3,22 @@
 #define WHEEL_OFF              (0x00) // Motor stopped (0% PWM duty)
 
 //------------------------------------------------------------------------------
-// Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins
-//   P6.1 = R_FORWARD --> TB3CCR1
-//   P6.2 = L_FORWARD --> TB3CCR2
-//   P6.3 = R_REVERSE --> TB3CCR3
-//   P6.4 = L_REVERSE --> TB3CCR4
+// Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins.
+//
+// EMPIRICAL MAPPING for this specific car (verified via F/B/R/L TCP tests):
+//   P6.1 = RIGHT REVERSE  --> TB3CCR1   (NOT right forward as labeled)
+//   P6.2 = LEFT  FORWARD  --> TB3CCR2
+//   P6.3 = RIGHT FORWARD  --> TB3CCR3   (NOT right reverse as labeled)
+//   P6.4 = LEFT  REVERSE  --> TB3CCR4
+//
+// The R_FORWARD / R_REVERSE Port-6-bit names in this file still reflect the
+// schematic labels; only the speed macros below are swapped so that calling
+// Forward_On()/Reverse_On()/Spin_*_On() drive the correct directions on THIS
+// car.
 //------------------------------------------------------------------------------
-#define RIGHT_FORWARD_SPEED (TB3CCR1)  // P6.1 R_FORWARD
+#define RIGHT_FORWARD_SPEED (TB3CCR3)  // P6.3 (empirically right forward)
 #define LEFT_FORWARD_SPEED  (TB3CCR2)  // P6.2 L_FORWARD
-#define RIGHT_REVERSE_SPEED (TB3CCR3)  // P6.3 R_REVERSE
+#define RIGHT_REVERSE_SPEED (TB3CCR1)  // P6.1 (empirically right reverse)
 #define LEFT_REVERSE_SPEED  (TB3CCR4)  // P6.4 L_REVERSE
 
 // Port 1 Pins
