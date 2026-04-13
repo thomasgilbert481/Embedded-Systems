@@ -95,11 +95,12 @@ void main(void){
     //==========================================================================
     while(ALWAYS){
 
-        IOT_Process();          // Drain UCA0 RX ring into IOT_Data[][]
-        IOT_State_Machine();    // Drive AT command sequence / parse +IPD
+        IOT_Process();            // Drain UCA0 RX ring into IOT_Data[][]
+        IOT_State_Machine();      // Drive AT command sequence / parse +IPD
+        Process_Vehicle_Queue();  // Dequeue next timed motor command if any
 
-        Display_Process();      // Refresh LCD if display_changed
-        Switches_Process();     // (no-op stub from Project 8)
+        Display_Process();        // Refresh LCD if display_changed
+        Switches_Process();       // (no-op stub from Project 8)
 
         P3OUT ^= TEST_PROBE;    // Heartbeat
     }

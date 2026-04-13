@@ -282,59 +282,54 @@ void IOT_State_Machine(void){
 }
 
 //==============================================================================
-// Parse_IPD_Command -- parse "+IPD,<conn>,<len>:<payload>" line.
-//   payload format:   ^<PIN0><PIN1><PIN2><PIN3><dir><t3><t2><t1><t0>
-//   e.g.              ^1234F0010   -> Forward, 10 * 100ms = 1.0 s
+// Vehicle command queue
+//   Holds pending commands parsed from one or more +IPD payloads.
+//   A single TCP message may contain several chained commands, e.g.
+//     ^1234F0020^1234R0010
+//   All valid commands are pushed in order; Process_Vehicle_Queue() starts
+//   the next one as soon as the active command's auto-stop fires.
 //==============================================================================
-void Parse_IPD_Command(char *line){
-    char         *payload;
+#define CMD_QUEUE_SIZE      (8)
+
+typedef struct {
     char          dir;
     unsigned int  time_units;
-    unsigned int  i;
+} vehicle_cmd_t;
 
-    // RED LED is owned by the DAC ramp ISR; do not touch it here.
-    USB_transmit_string("IPD!\r\n");
+static vehicle_cmd_t          cmd_queue[CMD_QUEUE_SIZE];
+static volatile unsigned int  cmd_q_head = 0;  // pop from head
+static volatile unsigned int  cmd_q_tail = 0;  // push to tail
 
-    // Locate ':' that separates header from payload
-    payload = strchr(line, ':');
-    if(payload == NULL){
-        USB_transmit_string("ERR: +IPD no ':'\r\n");
-        return;
+static unsigned char cmd_queue_empty(void){
+    return (unsigned char)(cmd_q_head == cmd_q_tail);
+}
+
+static unsigned char cmd_queue_push(char dir, unsigned int time_units){
+    unsigned int next_tail = (cmd_q_tail + 1) % CMD_QUEUE_SIZE;
+    if(next_tail == cmd_q_head){
+        return 0;   // full
     }
-    payload++;   // first byte of payload
+    cmd_queue[cmd_q_tail].dir = dir;
+    cmd_queue[cmd_q_tail].time_units = time_units;
+    cmd_q_tail = next_tail;
+    return 1;
+}
 
-    // Must start with the CARET prefix
-    if(payload[0] != SERIAL_CARET){
-        USB_transmit_string("ERR: missing ^\r\n");
-        return;
+static unsigned char cmd_queue_pop(char *dir, unsigned int *time_units){
+    if(cmd_queue_empty()){
+        return 0;
     }
+    *dir        = cmd_queue[cmd_q_head].dir;
+    *time_units = cmd_queue[cmd_q_head].time_units;
+    cmd_q_head  = (cmd_q_head + 1) % CMD_QUEUE_SIZE;
+    return 1;
+}
 
-    // Verify PIN
-    if(payload[1] != CMD_PIN_0 || payload[2] != CMD_PIN_1 ||
-       payload[3] != CMD_PIN_2 || payload[4] != CMD_PIN_3){
-        USB_transmit_string("ERR: bad PIN\r\n");
-        return;
-    }
-    USB_transmit_string("PIN ok\r\n");
-
-    // Direction byte
-    dir = payload[CMD_DIR_OFFSET];
-
-    // Time units -- 4 ASCII digits
-    time_units = BEGINNING;
-    for(i = BEGINNING; i < CMD_TIME_DIGITS; i++){
-        char c = payload[CMD_TIME_OFFSET + i];
-        if(c < '0' || c > '9'){
-            USB_transmit_string("ERR: bad time\r\n");
-            return;
-        }
-        time_units = (time_units * 10) + (unsigned int)(c - '0');
-    }
-
-    // Stop any in-flight motion before starting a new command (SAFETY)
+//==============================================================================
+// start_cmd -- kick off one queued command: set motors + arm auto-stop timer.
+//==============================================================================
+static void start_cmd(char dir, unsigned int time_units){
     Wheels_All_Off();
-    cmd_remaining_ms = BEGINNING;
-    cmd_active_dir   = SERIAL_NULL;
 
     switch(dir){
         case CMD_DIR_FORWARD:
@@ -358,15 +353,123 @@ void Parse_IPD_Command(char *line){
             return;
     }
 
-    // Arm the auto-stop countdown
     cmd_active_dir   = dir;
     cmd_active_time  = time_units;
     cmd_remaining_ms = time_units * CMD_TIME_UNIT_MS;
 }
 
 //==============================================================================
+// parse_one_cmd -- parse a single 10-byte command starting at ptr[0] == '^'.
+// Returns 1 on success (dir/time_units filled in), 0 on error.
+//==============================================================================
+static unsigned char parse_one_cmd(const char *ptr,
+                                   char *dir_out,
+                                   unsigned int *time_out){
+    unsigned int i;
+    unsigned int time_units;
+
+    if(ptr[0] != SERIAL_CARET){
+        return 0;
+    }
+    if(ptr[1] != CMD_PIN_0 || ptr[2] != CMD_PIN_1 ||
+       ptr[3] != CMD_PIN_2 || ptr[4] != CMD_PIN_3){
+        USB_transmit_string("ERR: bad PIN\r\n");
+        return 0;
+    }
+    time_units = BEGINNING;
+    for(i = 0; i < CMD_TIME_DIGITS; i++){
+        char c = ptr[CMD_TIME_OFFSET + i];
+        if(c < '0' || c > '9'){
+            USB_transmit_string("ERR: bad time\r\n");
+            return 0;
+        }
+        time_units = (time_units * 10) + (unsigned int)(c - '0');
+    }
+    *dir_out  = ptr[CMD_DIR_OFFSET];
+    *time_out = time_units;
+    return 1;
+}
+
+//==============================================================================
+// Parse_IPD_Command -- parse "+IPD,<conn>,<len>:<payload>" line.
+//   payload format:   one or more  ^<PIN0-3><dir><time0-3>  commands,
+//                     optionally separated by whitespace.
+//   e.g.              ^1234F0020
+//                     ^1234F0020^1234R0010
+//                     ^1234F0020 ^1234R0010
+// All valid commands are queued in order.  The first command starts
+// immediately if nothing is currently running; later ones are dequeued
+// by Process_Vehicle_Queue() after each auto-stop.
+//==============================================================================
+void Parse_IPD_Command(char *line){
+    char          *payload;
+    const char    *p;
+    char           dir;
+    unsigned int   time_units;
+    unsigned int   queued_count = 0;
+
+    USB_transmit_string("IPD!\r\n");
+
+    payload = strchr(line, ':');
+    if(payload == NULL){
+        USB_transmit_string("ERR: +IPD no ':'\r\n");
+        return;
+    }
+    payload++;  // first byte of payload
+
+    // Walk the payload, parsing every '^'-prefixed command we find.
+    p = payload;
+    while(*p != SERIAL_NULL && *p != SERIAL_CR && *p != SERIAL_LF){
+        if(*p == SERIAL_CARET){
+            if(!parse_one_cmd(p, &dir, &time_units)){
+                return;  // parse error already printed
+            }
+            if(!cmd_queue_push(dir, time_units)){
+                USB_transmit_string("ERR: queue full\r\n");
+                break;
+            }
+            queued_count++;
+            p += CMD_PAYLOAD_LEN;   // skip the 10 bytes we just consumed
+        } else {
+            p++;                    // skip whitespace / separators
+        }
+    }
+
+    if(queued_count == 0){
+        USB_transmit_string("ERR: no cmd\r\n");
+        return;
+    }
+
+    USB_transmit_string("PIN ok\r\n");
+
+    // If nothing is currently running, start the first queued command now.
+    if(cmd_remaining_ms == BEGINNING){
+        if(cmd_queue_pop(&dir, &time_units)){
+            start_cmd(dir, time_units);
+        }
+    }
+}
+
+//==============================================================================
+// Process_Vehicle_Queue -- called from the main loop. When the active
+// command's auto-stop has fired, pop the next queued command and start it.
+//==============================================================================
+void Process_Vehicle_Queue(void){
+    char         dir;
+    unsigned int time_units;
+
+    if(cmd_remaining_ms == BEGINNING && !cmd_queue_empty()){
+        if(cmd_queue_pop(&dir, &time_units)){
+            start_cmd(dir, time_units);
+        }
+    }
+}
+
+//==============================================================================
 // Vehicle_Cmd_Tick -- called from Timer B0 CCR0 ISR every TB0_TICK_MS (200ms).
 // Decrements the active-command countdown and stops motors when it reaches 0.
+// Queue dequeue is NOT done here -- Process_Vehicle_Queue() handles that from
+// main-loop context so we never call USB_transmit_string from ISR.
 //==============================================================================
 void Vehicle_Cmd_Tick(void){
     if(cmd_remaining_ms == BEGINNING){
