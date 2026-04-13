@@ -97,6 +97,11 @@ static int find_in_iot_data(const char *needle){
 }
 
 //==============================================================================
+// Forward declarations for static helpers defined below IOT_State_Machine.
+//==============================================================================
+static unsigned int parse_ipd_len(const char *line);
+
+//==============================================================================
 // Helper: build "AT+CIPSERVER=1,<IOT_TCP_PORT>\r\n" into AT_CIPSERVER[]
 //==============================================================================
 static void build_cipserver_string(void){
