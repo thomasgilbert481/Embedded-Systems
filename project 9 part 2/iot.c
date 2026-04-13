@@ -250,28 +250,36 @@ void IOT_State_Machine(void){
 
         case IOT_STATE_RUNNING: {
             // Scan for "+IPD" -- the TCP client sent us a payload.
-            // Only parse once the line contains the ':' separator AND has
-            // enough payload bytes after it -- otherwise we can race the
-            // incoming byte stream and see "+IPD,0,10" before the rest
-            // arrives, which would fail the ':' lookup.
+            // Wait until we have ALL <len> bytes of the payload before
+            // calling the parser.  Parsing early would see only the first
+            // command of a concatenated "^1234F0020^1234R0010" send, queue
+            // just that, and clear the row -- dropping the rest.
             int i;
             for(i = 0; i < IOT_DATA_LINES; i++){
+                char          *colon;
+                unsigned int   expected_len;
+                unsigned int   actual_len;
+
                 if(IOT_Data[i][0] == SERIAL_NULL){
                     continue;
                 }
-                if(strstr(IOT_Data[i], "+IPD") != NULL){
-                    char *colon = strchr(IOT_Data[i], ':');
-                    if(colon != NULL){
-                        // Need CARET + 4 PIN + 1 dir + 4 time-units = 10 bytes
-                        unsigned int payload_len = (unsigned int)strlen(colon + 1);
-                        if(payload_len >= CMD_PAYLOAD_LEN){
-                            Parse_IPD_Command(IOT_Data[i]);
-                            IOT_Data[i][0] = SERIAL_NULL;
-                        }
-                        // else: wait another main-loop pass; do NOT clear
-                    }
-                    // else: ':' not in buffer yet; wait for next pass
+                if(strstr(IOT_Data[i], "+IPD") == NULL){
+                    continue;
                 }
+                colon = strchr(IOT_Data[i], ':');
+                if(colon == NULL){
+                    continue;       // header not yet complete
+                }
+                expected_len = parse_ipd_len(IOT_Data[i]);
+                if(expected_len == 0){
+                    continue;       // malformed or length field incomplete
+                }
+                actual_len = (unsigned int)strlen(colon + 1);
+                if(actual_len < expected_len){
+                    continue;       // still receiving; wait for next pass
+                }
+                Parse_IPD_Command(IOT_Data[i]);
+                IOT_Data[i][0] = SERIAL_NULL;
             }
         } break;
 
@@ -279,6 +287,42 @@ void IOT_State_Machine(void){
             iot_state = IOT_STATE_WAIT_READY;
             break;
     }
+}
+
+//==============================================================================
+// parse_ipd_len -- extract <len> from "+IPD,<conn>,<len>:"
+// Returns 0 if the header is malformed or the length field isn't complete yet.
+//==============================================================================
+static unsigned int parse_ipd_len(const char *line){
+    const char *p;
+    unsigned int len = 0;
+    unsigned char digits = 0;
+
+    p = strstr(line, "+IPD,");
+    if(p == NULL){
+        return 0;
+    }
+    p += 5;   // skip "+IPD,"
+
+    // Skip connection-id field up to the next comma
+    while(*p != SERIAL_NULL && *p != ','){
+        p++;
+    }
+    if(*p != ','){
+        return 0;   // header not yet terminated with the 2nd comma
+    }
+    p++;
+
+    // Parse length digits until ':'
+    while(*p >= '0' && *p <= '9'){
+        len = (len * 10) + (unsigned int)(*p - '0');
+        digits++;
+        p++;
+    }
+    if(digits == 0 || *p != ':'){
+        return 0;   // length field incomplete
+    }
+    return len;
 }
 
 //==============================================================================
