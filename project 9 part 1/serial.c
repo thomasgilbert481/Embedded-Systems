@@ -317,15 +317,11 @@ __interrupt void eUSCI_A1_ISR(void){
       // ^F -> switch UCA0 to 115,200 baud
       // ^S -> switch UCA0 to   9,600 baud
       // These bytes are consumed by the FRAM and NOT forwarded to the ESP32.
+      //
+      // Order matters: dispatch FIRST when already collecting, so that the
+      // second '^' of "^^" lands in the dispatch (FRAM_CMD_PING) instead of
+      // re-arming fram_cmd_active.
       //----------------------------------------------------------------------
-      if(usb_value == SERIAL_CARET){
-        fram_cmd_active = TRUE;
-        // Echo the '^' so the operator sees it in Termite
-        while(!(UCA1IFG & UCTXIFG));
-        UCA1TXBUF = usb_value;
-        break;                            // Do NOT forward '^' to ESP32
-      }
-
       if(fram_cmd_active){
         fram_cmd_active = FALSE;
         // Echo the command character to Termite
@@ -355,6 +351,14 @@ __interrupt void eUSCI_A1_ISR(void){
             break;
         }
         break;                            // FRAM command handled, do not forward
+      }
+
+      if(usb_value == SERIAL_CARET){
+        fram_cmd_active = TRUE;
+        // Echo the '^' so the operator sees it in Termite
+        while(!(UCA1IFG & UCTXIFG));
+        UCA1TXBUF = usb_value;
+        break;                            // Do NOT forward '^' to ESP32
       }
 
       //----------------------------------------------------------------------
