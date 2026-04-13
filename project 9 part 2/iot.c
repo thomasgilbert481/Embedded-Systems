@@ -292,8 +292,7 @@ void Parse_IPD_Command(char *line){
     unsigned int  time_units;
     unsigned int  i;
 
-    // DEBUG: RED LED ON at entry -- if it ever flickers, parse was reached.
-    P1OUT |= RED_LED;
+    // RED LED is owned by the DAC ramp ISR; do not touch it here.
     USB_transmit_string("IPD!\r\n");
 
     // Locate ':' that separates header from payload

@@ -137,11 +137,12 @@ void Init_Port2(void){
     IOT_RUN_DIR  |=  IOT_RUN_PIN;
     IOT_RUN_PORT &= ~IOT_RUN_PIN;
 
-    // P2.5 -- DAC_ENB: HIGH = buck-boost enabled (motor 5V rail ON).
-    // In P9P2 we need motor power immediately; no DAC ramp sequence.
+    // P2.5 -- DAC_ENB: LOW at startup; TB0 overflow ISR drives it HIGH after
+    //                    DAC_ENABLE_TICKS have elapsed (lets DAC output settle
+    //                    before the buck-boost converter sees it).
     P2SEL0 &= ~DAC_ENB;
     P2SEL1 &= ~DAC_ENB;
-    P2OUT  |=  DAC_ENB;             // HIGH -> motor supply ON
+    P2OUT  &= ~DAC_ENB;
     P2DIR  |=  DAC_ENB;
 
     // P2.6-P2.7 -- LFXOUT/LFXIN (crystal function)
