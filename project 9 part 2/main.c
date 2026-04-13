@@ -64,6 +64,13 @@ void main(void){
     // 2. UCA0 (IOT port)
     Init_Serial_UCA0(BAUD_115200);
 
+    // P9P2 -- open the PC TX gate unconditionally so Termite always mirrors
+    // ESP32 traffic (AT responses, +IPD frames, CMD: echoes).  No need for
+    // the user to press a key first.  The gate is only protective against
+    // the FRAM spamming the PC before Termite is connected, which is fine
+    // to waive once the state machine is running.
+    pc_ok_to_tx = TRUE;
+
     // 3. Release IOT from reset (>= 100 ms low) -- AFTER both UARTs are up
     {
         volatile unsigned long dly;

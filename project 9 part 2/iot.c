@@ -266,6 +266,10 @@ void Parse_IPD_Command(char *line){
     unsigned int  time_units;
     unsigned int  i;
 
+    // DEBUG: RED LED ON at entry -- if it ever flickers, parse was reached.
+    P1OUT |= RED_LED;
+    USB_transmit_string("IPD!\r\n");
+
     // Locate ':' that separates header from payload
     payload = strchr(line, ':');
     if(payload == NULL){
@@ -286,6 +290,7 @@ void Parse_IPD_Command(char *line){
         USB_transmit_string("ERR: bad PIN\r\n");
         return;
     }
+    USB_transmit_string("PIN ok\r\n");
 
     // Direction byte
     dir = payload[CMD_DIR_OFFSET];
