@@ -222,6 +222,8 @@ void IOT_State_Machine(void){
             int row = find_in_iot_data("STAIP");
             if(row >= 0){
                 // Response row looks like:  +CIFSR:STAIP,"10.152.15.74"
+                // Don't transition state until BOTH quotes have arrived in
+                // the buffer -- otherwise car_ip would be left empty.
                 char *q1 = strchr(IOT_Data[row], '"');
                 char *q2 = (q1 != NULL) ? strchr(q1 + 1, '"') : NULL;
                 if(q1 && q2 && q2 > q1){
@@ -231,25 +233,26 @@ void IOT_State_Machine(void){
                     }
                     memcpy(car_ip, q1 + 1, len);
                     car_ip[len] = SERIAL_NULL;
-                }
-                clear_iot_data();
 
-                // If the Wi-Fi hasn't finished associating yet, CIFSR returns
-                // "0.0.0.0". Keep polling until we get a real lease.
-                if(car_ip[0] == '0' && car_ip[1] == '.'){
-                    USB_transmit_string("IP=0.0.0.0, retrying\r\n");
-                    iot_wait_cnt = BEGINNING;
-                    iot_state = IOT_STATE_SEND_CIFSR;
+                    clear_iot_data();
+
+                    // If Wi-Fi hasn't associated yet, CIFSR returns 0.0.0.0.
+                    if(car_ip[0] == '0' && car_ip[1] == '.'){
+                        USB_transmit_string("IP=0.0.0.0, retrying\r\n");
+                        iot_wait_cnt = BEGINNING;
+                        iot_state = IOT_STATE_SEND_CIFSR;
+                        break;
+                    }
+
+                    USB_transmit_string("IP=");
+                    USB_transmit_string(car_ip);
+                    USB_transmit_string("\r\n");
+
+                    Display_Network_Info();
+                    iot_state = IOT_STATE_RUNNING;
                     break;
                 }
-
-                USB_transmit_string("IP=");
-                USB_transmit_string(car_ip);
-                USB_transmit_string("\r\n");
-
-                Display_Network_Info();
-                iot_state = IOT_STATE_RUNNING;
-                break;
+                // STAIP seen but closing quote not yet received -- keep waiting.
             }
             if(++iot_wait_cnt > IOT_TIMEOUT_GENERIC){
                 iot_wait_cnt = BEGINNING;
