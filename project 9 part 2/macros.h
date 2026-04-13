@@ -177,11 +177,13 @@
 
 //------------------------------------------------------------------------------
 // IOT state-machine timeouts (counted in main-loop iterations -- coarse)
+// Main loop runs ~8000 iter/s, so 500,000 ~= 60 s.
 //------------------------------------------------------------------------------
-#define IOT_TIMEOUT_READY   (40000u)   // ~ESP32 boot ready
-#define IOT_TIMEOUT_AT      (20000u)   // AT/OK round-trip
-#define IOT_TIMEOUT_WIFI    (60000u)   // Wi-Fi join + DHCP
-#define IOT_TIMEOUT_GENERIC (15000u)   // Other AT commands
+#define IOT_TIMEOUT_READY   (200000u)  // ESP32 boot ready
+#define IOT_TIMEOUT_AT      (50000u)   // AT/OK round-trip
+#define IOT_TIMEOUT_WIFI    (500000u)  // Wi-Fi join + DHCP (can take a while)
+#define IOT_TIMEOUT_GENERIC (30000u)   // Other AT commands
+#define IOT_TIMEOUT_CIFSR   (80000u)   // Retry CIFSR ~every 10 s until IP non-zero
 
 //------------------------------------------------------------------------------
 // Default TCP port -- TA recommends 8181 (less likely blocked on NCSU WiFi)

@@ -228,6 +228,16 @@ void IOT_State_Machine(void){
                     car_ip[len] = SERIAL_NULL;
                 }
                 clear_iot_data();
+
+                // If the Wi-Fi hasn't finished associating yet, CIFSR returns
+                // "0.0.0.0". Keep polling until we get a real lease.
+                if(car_ip[0] == '0' && car_ip[1] == '.'){
+                    USB_transmit_string("IP=0.0.0.0, retrying\r\n");
+                    iot_wait_cnt = BEGINNING;
+                    iot_state = IOT_STATE_SEND_CIFSR;
+                    break;
+                }
+
                 Display_Network_Info();
                 iot_state = IOT_STATE_RUNNING;
                 break;
@@ -240,11 +250,27 @@ void IOT_State_Machine(void){
 
         case IOT_STATE_RUNNING: {
             // Scan for "+IPD" -- the TCP client sent us a payload.
+            // Only parse once the line contains the ':' separator AND has
+            // enough payload bytes after it -- otherwise we can race the
+            // incoming byte stream and see "+IPD,0,10" before the rest
+            // arrives, which would fail the ':' lookup.
             int i;
             for(i = 0; i < IOT_DATA_LINES; i++){
-                if(IOT_Data[i][0] != SERIAL_NULL && strstr(IOT_Data[i], "+IPD")){
-                    Parse_IPD_Command(IOT_Data[i]);
-                    IOT_Data[i][0] = SERIAL_NULL;
+                if(IOT_Data[i][0] == SERIAL_NULL){
+                    continue;
+                }
+                if(strstr(IOT_Data[i], "+IPD") != NULL){
+                    char *colon = strchr(IOT_Data[i], ':');
+                    if(colon != NULL){
+                        // Need CARET + 4 PIN + 1 dir + 4 time-units = 10 bytes
+                        unsigned int payload_len = (unsigned int)strlen(colon + 1);
+                        if(payload_len >= CMD_PAYLOAD_LEN){
+                            Parse_IPD_Command(IOT_Data[i]);
+                            IOT_Data[i][0] = SERIAL_NULL;
+                        }
+                        // else: wait another main-loop pass; do NOT clear
+                    }
+                    // else: ':' not in buffer yet; wait for next pass
                 }
             }
         } break;
