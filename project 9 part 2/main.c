@@ -58,6 +58,7 @@ void main(void){
     Init_Timers();             // Timer B0 (200 ms) + Timer B3 (motor PWM)
     Init_LCD();                // SPI LCD init
     Init_DAC();                // SAC3 DAC -> LT1935 buck-boost -> motor 6V rail
+    Init_ADC();                // 12-bit ADC for IR line detectors + thumbwheel
 
     // 1. UCA1 (PC backchannel) -- resets pc_ok_to_tx to FALSE
     Init_Serial_UCA1(BAUD_115200);
@@ -97,6 +98,8 @@ void main(void){
 
         IOT_Process();            // Drain UCA0 RX ring into IOT_Data[][]
         IOT_State_Machine();      // Drive AT command sequence / parse +IPD
+        Calibration_Tick();       // Advance ^C calibration state machine
+        Line_Follow_Tick();       // Update line-follow PWM from ADC
         Process_Vehicle_Queue();  // Dequeue next timed motor command if any
 
         Display_Process();        // Refresh LCD if display_changed

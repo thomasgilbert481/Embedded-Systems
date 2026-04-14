@@ -122,3 +122,13 @@ void Process_Vehicle_Queue(void);  // Main loop -- starts next queued cmd
 
 // DAC (dac.c) -- sets up buck-boost motor supply rail
 void Init_DAC(void);
+
+// ADC (adc.c)
+void Init_ADC(void);
+
+// Modes (modes.c) -- calibration and line-follow helpers
+void Quit_Everything(void);
+void Calibration_Start(void);
+void Calibration_Tick(void);
+void Line_Follow_Start(unsigned int seconds);
+void Line_Follow_Tick(void);

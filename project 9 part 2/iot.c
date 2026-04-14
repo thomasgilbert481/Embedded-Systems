@@ -30,6 +30,7 @@
 #include "functions.h"
 #include "serial.h"
 #include "iot.h"
+#include "modes.h"
 
 //==============================================================================
 // External LCD globals
@@ -366,6 +367,18 @@ static void start_cmd(char dir, unsigned int time_units){
             Spin_CCW_On();
             USB_transmit_string("CMD: L\r\n");
             break;
+        case CMD_DIR_CALIBRATE:
+            // Not time-bounded; hands control to the calibration state machine.
+            Calibration_Start();
+            return;
+        case CMD_DIR_LINE_FOLLOW:
+            // time_units is in 100 ms units; Line_Follow_Start wants seconds.
+            Line_Follow_Start(time_units / 10);
+            return;
+        case CMD_DIR_QUIT:
+            // Queued quit -- also valid, same as the immediate path.
+            Quit_Everything();
+            return;
         default:
             USB_transmit_string("ERR: bad dir\r\n");
             return;
@@ -442,6 +455,17 @@ void Parse_IPD_Command(char *line){
             if(!parse_one_cmd(p, &dir, &time_units)){
                 return;  // parse error already printed
             }
+
+            // Q is a control command -- execute IMMEDIATELY, do not queue.
+            // Clears any queue we've already built up in this same payload too.
+            if(dir == CMD_DIR_QUIT){
+                Quit_Everything();
+                cmd_q_head = cmd_q_tail;   // flush any pending
+                p += CMD_PAYLOAD_LEN;
+                queued_count = 1;          // suppress "ERR: no cmd"
+                continue;
+            }
+
             if(!cmd_queue_push(dir, time_units)){
                 USB_transmit_string("ERR: queue full\r\n");
                 break;
@@ -461,7 +485,7 @@ void Parse_IPD_Command(char *line){
     USB_transmit_string("PIN ok\r\n");
 
     // If nothing is currently running, start the first queued command now.
-    if(cmd_remaining_ms == BEGINNING){
+    if(cmd_remaining_ms == BEGINNING && !mode_cal_active && !mode_line_active){
         if(cmd_queue_pop(&dir, &time_units)){
             start_cmd(dir, time_units);
         }
@@ -475,6 +499,11 @@ void Parse_IPD_Command(char *line){
 void Process_Vehicle_Queue(void){
     char         dir;
     unsigned int time_units;
+
+    // Don't pop queued F/B/R/L while calibration or line-follow owns the car.
+    if(mode_cal_active || mode_line_active){
+        return;
+    }
 
     if(cmd_remaining_ms == BEGINNING && !cmd_queue_empty()){
         if(cmd_queue_pop(&dir, &time_units)){

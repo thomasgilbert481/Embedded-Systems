@@ -156,8 +156,20 @@
 #define CMD_DIR_BACKWARD    ('B')
 #define CMD_DIR_RIGHT       ('R')
 #define CMD_DIR_LEFT        ('L')
+#define CMD_DIR_QUIT        ('Q')   // ^1234Q0000 -- abort current cmd + queue
+#define CMD_DIR_CALIBRATE   ('C')   // ^1234C0000 -- run white/black calibration
+#define CMD_DIR_LINE_FOLLOW ('N')   // ^1234N<time> -- liNe follow for time
 #define CMD_TIME_UNIT_MS    (100)      // each time-unit digit = 100 ms
 #define CMD_PAYLOAD_LEN     (10)       // ^ + 4 PIN + 1 dir + 4 time
+
+//------------------------------------------------------------------------------
+// Line following / calibration constants
+//------------------------------------------------------------------------------
+#define LINE_FOLLOW_DEFAULT_SECONDS (30)   // Default if ^..N0000 sent with 0 time
+#define CAL_SAMPLE_DELAY_MS         (1000) // Hold each surface for ~1 s after SW1
+#define LINE_FOLLOW_BASE_SPEED      (25000) // ~50% duty straight
+#define LINE_FOLLOW_KP              (100)   // Proportional gain
+#define LINE_FOLLOW_MAX_PWM         (32000) // Clamp (must fit in signed int)
 
 //------------------------------------------------------------------------------
 // Motor command countdown -- decrement step in CCR0 ISR (every 200 ms)
