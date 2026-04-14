@@ -290,11 +290,13 @@ void Init_Ports(void){ //Init all ports
         P6SEL1 &= ~L_REVERSE;         // Timer B3 function: SEL1 = 0
         P6DIR  |=  L_REVERSE;         // Output direction required for timer output
 
-        // P6.5 unused -- keep as GPIO input
-        P6SEL0 &= ~P6_5;
+        // P6.5 -- LEFT_REVERSE on this car (TB3.5 PWM).  The schematic names
+        // P6.1 for R_FORWARD, but empirical F/B/R/L tests showed TB3CCR1/P6.1
+        // isn't routed to any H-bridge input on the kit, so the motor CCRs
+        // are mapped to TB3CCR2-5 and P6.5 must be selected as TB3 output.
+        P6SEL0 |=  P6_5;
         P6SEL1 &= ~P6_5;
-        P6OUT &= ~P6_5;
-        P6DIR &= ~P6_5;               // Input (unused)
+        P6DIR  |=  P6_5;
 
         // Green LED (P6.6) -- GPIO output
         P6SEL0 &= ~GRN_LED;
