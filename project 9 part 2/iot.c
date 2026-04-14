@@ -262,14 +262,21 @@ void IOT_State_Machine(void){
 
         case IOT_STATE_RUNNING: {
             // Scan for "+IPD" -- the TCP client sent us a payload.
-            // Wait until we have ALL <len> bytes of the payload before
-            // calling the parser.  Parsing early would see only the first
-            // command of a concatenated "^1234F0020^1234R0010" send, queue
-            // just that, and clear the row -- dropping the rest.
+            //
+            // Parse as soon as we have at least one full 10-byte command
+            // (CMD_PAYLOAD_LEN) after ':'. We deliberately do NOT compare
+            // against the <len> field in the "+IPD,0,<len>:" header --
+            // many clients (e.g. Magic Smoke) append CR+LF to their
+            // commands, so the wire length includes bytes that
+            // IOT_Process strips (\r skipped, \n terminates the row).
+            // Using the header length here would leave us waiting forever.
+            //
+            // Parse_IPD_Command itself walks the payload and queues every
+            // valid '^'-prefixed command it finds, so concatenated multi-
+            // command sends still work as long as they arrive in one row.
             int i;
             for(i = 0; i < IOT_DATA_LINES; i++){
                 char          *colon;
-                unsigned int   expected_len;
                 unsigned int   actual_len;
 
                 if(IOT_Data[i][0] == SERIAL_NULL){
@@ -282,13 +289,9 @@ void IOT_State_Machine(void){
                 if(colon == NULL){
                     continue;       // header not yet complete
                 }
-                expected_len = parse_ipd_len(IOT_Data[i]);
-                if(expected_len == 0){
-                    continue;       // malformed or length field incomplete
-                }
                 actual_len = (unsigned int)strlen(colon + 1);
-                if(actual_len < expected_len){
-                    continue;       // still receiving; wait for next pass
+                if(actual_len < CMD_PAYLOAD_LEN){
+                    continue;       // still receiving first full command
                 }
                 Parse_IPD_Command(IOT_Data[i]);
                 IOT_Data[i][0] = SERIAL_NULL;
