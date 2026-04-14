@@ -10,18 +10,26 @@
 #define PERCENT_80            (40004) // 40004/50005 = ~80% duty for LCD backlight
 
 //------------------------------------------------------------------------------
-// Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins
-//   P6.1 = R_FORWARD (0x02) --> TB3CCR1
-//   P6.2 = L_FORWARD (0x04) --> TB3CCR2
-//   P6.3 = R_REVERSE (0x08) --> TB3CCR3
-//   P6.4 = L_REVERSE (0x10) --> TB3CCR4
-//   P6.5 = backlight dim    --> TB3CCR5 (LCD_BACKLITE_DIMING)
+// Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins.
+//
+// Mapping aligned with the working reference implementation (NProject 9)
+// after discovering that on this car kit TB3CCR1 / P6.1 is not routed to
+// any H-bridge input.  Motors live on TB3CCR2-5 (P6.2-P6.5).
+//   TB3CCR1 --> P6.1  (unused on this car)
+//   TB3CCR2 --> P6.2  RIGHT FORWARD
+//   TB3CCR3 --> P6.3  LEFT  FORWARD
+//   TB3CCR4 --> P6.4  RIGHT REVERSE
+//   TB3CCR5 --> P6.5  LEFT  REVERSE
+//
+// P6.5 must be selected as TB3 function (SEL0=1) in Init_Port6 for the
+// LEFT_REVERSE PWM to actually drive the pin.
 //------------------------------------------------------------------------------
-#define RIGHT_FORWARD_SPEED (TB3CCR1)  // P6.1 R_FORWARD
-#define LEFT_FORWARD_SPEED  (TB3CCR2)  // P6.2 L_FORWARD
-#define RIGHT_REVERSE_SPEED (TB3CCR3)  // P6.3 R_REVERSE
-#define LEFT_REVERSE_SPEED  (TB3CCR4)  // P6.4 L_REVERSE
-#define LCD_BACKLITE_DIMING (TB3CCR5)  // P6.5 LCD backlight PWM dim
+#define RIGHT_FORWARD_SPEED (TB3CCR2)  // P6.2
+#define LEFT_FORWARD_SPEED  (TB3CCR3)  // P6.3
+#define RIGHT_REVERSE_SPEED (TB3CCR4)  // P6.4
+#define LEFT_REVERSE_SPEED  (TB3CCR5)  // P6.5
+// NOTE: LCD backlight dimming (was TB3CCR5) no longer routable via PWM -- use
+// GPIO toggle on P6.0 (LCD_BACKLITE) if brightness control is needed.
 
 #define STEP                   (2000)
 #define FORWARD                (0x00) // FORWARD

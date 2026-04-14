@@ -125,23 +125,26 @@ void Init_Timer_B3(void){
 
     TB3CCR0 = WHEEL_PERIOD_VAL;       // PWM period: 50005 cycles = ~6.25 ms
 
-    // CCR1: Right Forward (P6.1, R_FORWARD)
-    TB3CCTL1 = OUTMOD_7;              // Output mode 7: reset/set
-    RIGHT_FORWARD_SPEED = WHEEL_OFF;  // Start with motor off (0% duty cycle)
+    // Motor CCRs are mapped via ports.h to TB3CCR2-CCR5 (not 1-4):
+    //   CCR2 -> P6.2 = RIGHT_FORWARD
+    //   CCR3 -> P6.3 = LEFT_FORWARD
+    //   CCR4 -> P6.4 = RIGHT_REVERSE
+    //   CCR5 -> P6.5 = LEFT_REVERSE
+    // TB3CCR1 / P6.1 is unused on this car (not routed on the PCB).
 
-    // CCR2: Left Forward (P6.2, L_FORWARD)
-    TB3CCTL2 = OUTMOD_7;              // Output mode 7: reset/set
-    LEFT_FORWARD_SPEED = WHEEL_OFF;   // Start with motor off
+    TB3CCTL1 = OUTMOD_7;              // P6.1 (unused) -- kept LOW via WHEEL_OFF
+    TB3CCR1  = WHEEL_OFF;
 
-    // CCR3: Right Reverse (P6.3, R_REVERSE)
-    TB3CCTL3 = OUTMOD_7;              // Output mode 7: reset/set
-    RIGHT_REVERSE_SPEED = WHEEL_OFF;  // Start with motor off
+    TB3CCTL2 = OUTMOD_7;              // RIGHT_FORWARD  (P6.2)
+    RIGHT_FORWARD_SPEED = WHEEL_OFF;
 
-    // CCR4: Left Reverse (P6.4, L_REVERSE)
-    TB3CCTL4 = OUTMOD_7;              // Output mode 7: reset/set
-    LEFT_REVERSE_SPEED = WHEEL_OFF;   // Start with motor off
+    TB3CCTL3 = OUTMOD_7;              // LEFT_FORWARD   (P6.3)
+    LEFT_FORWARD_SPEED  = WHEEL_OFF;
 
-    // CCR5: Not used -- P6.5 is left as GPIO input in ports.c.
-    // LCD backlight is toggled on P6.0 (GPIO) in the CCR0 ISR.
+    TB3CCTL4 = OUTMOD_7;              // RIGHT_REVERSE  (P6.4)
+    RIGHT_REVERSE_SPEED = WHEEL_OFF;
+
+    TB3CCTL5 = OUTMOD_7;              // LEFT_REVERSE   (P6.5)
+    LEFT_REVERSE_SPEED  = WHEEL_OFF;
 //------------------------------------------------------------------------------
 }

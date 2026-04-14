@@ -97,11 +97,6 @@ static int find_in_iot_data(const char *needle){
 }
 
 //==============================================================================
-// Forward declarations for static helpers defined below IOT_State_Machine.
-//==============================================================================
-static unsigned int parse_ipd_len(const char *line);
-
-//==============================================================================
 // Helper: build "AT+CIPSERVER=1,<IOT_TCP_PORT>\r\n" into AT_CIPSERVER[]
 //==============================================================================
 static void build_cipserver_string(void){
@@ -222,6 +217,8 @@ void IOT_State_Machine(void){
             int row = find_in_iot_data("STAIP");
             if(row >= 0){
                 // Response row looks like:  +CIFSR:STAIP,"10.152.15.74"
+                // Don't transition state until BOTH quotes have arrived in
+                // the buffer -- otherwise car_ip would be left empty.
                 char *q1 = strchr(IOT_Data[row], '"');
                 char *q2 = (q1 != NULL) ? strchr(q1 + 1, '"') : NULL;
                 if(q1 && q2 && q2 > q1){
@@ -231,25 +228,26 @@ void IOT_State_Machine(void){
                     }
                     memcpy(car_ip, q1 + 1, len);
                     car_ip[len] = SERIAL_NULL;
-                }
-                clear_iot_data();
 
-                // If the Wi-Fi hasn't finished associating yet, CIFSR returns
-                // "0.0.0.0". Keep polling until we get a real lease.
-                if(car_ip[0] == '0' && car_ip[1] == '.'){
-                    USB_transmit_string("IP=0.0.0.0, retrying\r\n");
-                    iot_wait_cnt = BEGINNING;
-                    iot_state = IOT_STATE_SEND_CIFSR;
+                    clear_iot_data();
+
+                    // If Wi-Fi hasn't associated yet, CIFSR returns 0.0.0.0.
+                    if(car_ip[0] == '0' && car_ip[1] == '.'){
+                        USB_transmit_string("IP=0.0.0.0, retrying\r\n");
+                        iot_wait_cnt = BEGINNING;
+                        iot_state = IOT_STATE_SEND_CIFSR;
+                        break;
+                    }
+
+                    USB_transmit_string("IP=");
+                    USB_transmit_string(car_ip);
+                    USB_transmit_string("\r\n");
+
+                    Display_Network_Info();
+                    iot_state = IOT_STATE_RUNNING;
                     break;
                 }
-
-                USB_transmit_string("IP=");
-                USB_transmit_string(car_ip);
-                USB_transmit_string("\r\n");
-
-                Display_Network_Info();
-                iot_state = IOT_STATE_RUNNING;
-                break;
+                // STAIP seen but closing quote not yet received -- keep waiting.
             }
             if(++iot_wait_cnt > IOT_TIMEOUT_GENERIC){
                 iot_wait_cnt = BEGINNING;
@@ -259,14 +257,21 @@ void IOT_State_Machine(void){
 
         case IOT_STATE_RUNNING: {
             // Scan for "+IPD" -- the TCP client sent us a payload.
-            // Wait until we have ALL <len> bytes of the payload before
-            // calling the parser.  Parsing early would see only the first
-            // command of a concatenated "^1234F0020^1234R0010" send, queue
-            // just that, and clear the row -- dropping the rest.
+            //
+            // Parse as soon as we have at least one full 10-byte command
+            // (CMD_PAYLOAD_LEN) after ':'. We deliberately do NOT compare
+            // against the <len> field in the "+IPD,0,<len>:" header --
+            // many clients (e.g. Magic Smoke) append CR+LF to their
+            // commands, so the wire length includes bytes that
+            // IOT_Process strips (\r skipped, \n terminates the row).
+            // Using the header length here would leave us waiting forever.
+            //
+            // Parse_IPD_Command itself walks the payload and queues every
+            // valid '^'-prefixed command it finds, so concatenated multi-
+            // command sends still work as long as they arrive in one row.
             int i;
             for(i = 0; i < IOT_DATA_LINES; i++){
                 char          *colon;
-                unsigned int   expected_len;
                 unsigned int   actual_len;
 
                 if(IOT_Data[i][0] == SERIAL_NULL){
@@ -279,13 +284,9 @@ void IOT_State_Machine(void){
                 if(colon == NULL){
                     continue;       // header not yet complete
                 }
-                expected_len = parse_ipd_len(IOT_Data[i]);
-                if(expected_len == 0){
-                    continue;       // malformed or length field incomplete
-                }
                 actual_len = (unsigned int)strlen(colon + 1);
-                if(actual_len < expected_len){
-                    continue;       // still receiving; wait for next pass
+                if(actual_len < CMD_PAYLOAD_LEN){
+                    continue;       // still receiving first full command
                 }
                 Parse_IPD_Command(IOT_Data[i]);
                 IOT_Data[i][0] = SERIAL_NULL;
@@ -296,42 +297,6 @@ void IOT_State_Machine(void){
             iot_state = IOT_STATE_WAIT_READY;
             break;
     }
-}
-
-//==============================================================================
-// parse_ipd_len -- extract <len> from "+IPD,<conn>,<len>:"
-// Returns 0 if the header is malformed or the length field isn't complete yet.
-//==============================================================================
-static unsigned int parse_ipd_len(const char *line){
-    const char *p;
-    unsigned int len = 0;
-    unsigned char digits = 0;
-
-    p = strstr(line, "+IPD,");
-    if(p == NULL){
-        return 0;
-    }
-    p += 5;   // skip "+IPD,"
-
-    // Skip connection-id field up to the next comma
-    while(*p != SERIAL_NULL && *p != ','){
-        p++;
-    }
-    if(*p != ','){
-        return 0;   // header not yet terminated with the 2nd comma
-    }
-    p++;
-
-    // Parse length digits until ':'
-    while(*p >= '0' && *p <= '9'){
-        len = (len * 10) + (unsigned int)(*p - '0');
-        digits++;
-        p++;
-    }
-    if(digits == 0 || *p != ':'){
-        return 0;   // length field incomplete
-    }
-    return len;
 }
 
 //==============================================================================
