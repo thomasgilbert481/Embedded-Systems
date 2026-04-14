@@ -97,11 +97,6 @@ static int find_in_iot_data(const char *needle){
 }
 
 //==============================================================================
-// Forward declarations for static helpers defined below IOT_State_Machine.
-//==============================================================================
-static unsigned int parse_ipd_len(const char *line);
-
-//==============================================================================
 // Helper: build "AT+CIPSERVER=1,<IOT_TCP_PORT>\r\n" into AT_CIPSERVER[]
 //==============================================================================
 static void build_cipserver_string(void){
@@ -302,42 +297,6 @@ void IOT_State_Machine(void){
             iot_state = IOT_STATE_WAIT_READY;
             break;
     }
-}
-
-//==============================================================================
-// parse_ipd_len -- extract <len> from "+IPD,<conn>,<len>:"
-// Returns 0 if the header is malformed or the length field isn't complete yet.
-//==============================================================================
-static unsigned int parse_ipd_len(const char *line){
-    const char *p;
-    unsigned int len = 0;
-    unsigned char digits = 0;
-
-    p = strstr(line, "+IPD,");
-    if(p == NULL){
-        return 0;
-    }
-    p += 5;   // skip "+IPD,"
-
-    // Skip connection-id field up to the next comma
-    while(*p != SERIAL_NULL && *p != ','){
-        p++;
-    }
-    if(*p != ','){
-        return 0;   // header not yet terminated with the 2nd comma
-    }
-    p++;
-
-    // Parse length digits until ':'
-    while(*p >= '0' && *p <= '9'){
-        len = (len * 10) + (unsigned int)(*p - '0');
-        digits++;
-        p++;
-    }
-    if(digits == 0 || *p != ':'){
-        return 0;   // length field incomplete
-    }
-    return len;
 }
 
 //==============================================================================
