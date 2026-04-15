@@ -61,6 +61,47 @@ extern volatile char          cmd_active_dir;
 extern volatile unsigned int  cmd_active_time;
 
 //------------------------------------------------------------------------------
+// Helper: print a decimal uint via USB_transmit_string
+//------------------------------------------------------------------------------
+static void usb_print_uint(unsigned int v){
+    char    buf[8];
+    char    out[9];
+    unsigned int i = 0;
+    unsigned int j;
+
+    if(v == 0){
+        buf[i++] = '0';
+    } else {
+        while(v > 0 && i < sizeof(buf)){
+            buf[i++] = (char)('0' + (v % 10));
+            v /= 10;
+        }
+    }
+    // reverse into null-terminated out[]
+    for(j = 0; j < i; j++){
+        out[j] = buf[i - 1 - j];
+    }
+    out[i] = SERIAL_NULL;
+    USB_transmit_string(out);
+}
+
+static void dump_cal_values(void){
+    USB_transmit_string("CAL WL=");
+    usb_print_uint(white_left);
+    USB_transmit_string(" WR=");
+    usb_print_uint(white_right);
+    USB_transmit_string(" BL=");
+    usb_print_uint(black_left);
+    USB_transmit_string(" BR=");
+    usb_print_uint(black_right);
+    USB_transmit_string(" TL=");
+    usb_print_uint(threshold_left);
+    USB_transmit_string(" TR=");
+    usb_print_uint(threshold_right);
+    USB_transmit_string("\r\n");
+}
+
+//------------------------------------------------------------------------------
 // Calibration sub-states
 //------------------------------------------------------------------------------
 #define CAL_ST_PROMPT_WHITE (0)
@@ -183,6 +224,7 @@ void Calibration_Tick(void){
 
                 calibration_done = 1;
                 USB_transmit_string("CAL done\r\n");
+                dump_cal_values();   // Show everything we just captured
 
                 cal_sub_state = CAL_ST_FINISH;
                 cal_settle_cnt = 0;
@@ -234,6 +276,36 @@ void Line_Follow_Start(unsigned int seconds){
     mode_line_active = 1;
 
     USB_transmit_string("LINE start\r\n");
+    dump_cal_values();   // Show values being used
+}
+
+//------------------------------------------------------------------------------
+// Periodic ADC dump during line-follow (every ~0.5 s of main-loop ticks)
+//------------------------------------------------------------------------------
+static unsigned long line_dbg_cnt = 0;
+#define LINE_DBG_INTERVAL 4000
+
+static void line_follow_debug(int left_norm, int right_norm, int correction){
+    if(++line_dbg_cnt < LINE_DBG_INTERVAL){
+        return;
+    }
+    line_dbg_cnt = 0;
+    USB_transmit_string("L=");
+    usb_print_uint(ADC_Left_Detect);
+    USB_transmit_string(" R=");
+    usb_print_uint(ADC_Right_Detect);
+    USB_transmit_string(" Ln=");
+    usb_print_uint((unsigned int)left_norm);
+    USB_transmit_string(" Rn=");
+    usb_print_uint((unsigned int)right_norm);
+    USB_transmit_string(" corr=");
+    if(correction < 0){
+        USB_transmit_string("-");
+        usb_print_uint((unsigned int)(-correction));
+    } else {
+        usb_print_uint((unsigned int)correction);
+    }
+    USB_transmit_string("\r\n");
 }
 
 //==============================================================================
@@ -284,6 +356,8 @@ void Line_Follow_Tick(void){
 
     error      = right_norm - left_norm;
     correction = FOLLOW_KP * error;
+
+    line_follow_debug(left_norm, right_norm, correction);
 
     left_speed  = (int)FOLLOW_BASE + correction;
     right_speed = (int)FOLLOW_BASE - correction;
