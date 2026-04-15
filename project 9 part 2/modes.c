@@ -54,6 +54,10 @@ extern volatile unsigned char display_changed;
 extern volatile unsigned int sw1_pressed;
 extern volatile unsigned int sw2_pressed;
 
+// Timer B0 CCR0 tick counter (+1 per 200 ms) -- used for deterministic
+// calibration-settle delay the same way Project 7's p7_timer does.
+extern volatile unsigned int Time_Sequence;
+
 // Active-command state (in iot.c) -- used by Line_Follow_Start to set up
 // the auto-stop countdown.
 extern volatile unsigned int  cmd_remaining_ms;
@@ -120,7 +124,11 @@ static void lcd_show_cal_values(void){
 #define CAL_ST_FINISH       (6)
 
 static unsigned int cal_sub_state = CAL_ST_PROMPT_WHITE;
-static unsigned long cal_settle_cnt = 0;
+static unsigned int cal_start_tick = 0;  // Time_Sequence when sampling began
+
+// Number of 200 ms timer ticks to wait after SW1 before reading the ADC
+// (matches Project 7's CAL_SAMPLE_DELAY = 5 ticks = 1 second exactly).
+#define CAL_SETTLE_TICKS    (5)
 
 //==============================================================================
 // Quit_Everything -- ^1234Q0000 arrived.  Abort everything.
@@ -182,7 +190,7 @@ void Calibration_Tick(void){
         case CAL_ST_WAIT_WHITE:
             if(sw1_pressed){
                 sw1_pressed    = 0;
-                cal_settle_cnt = 0;
+                cal_start_tick = Time_Sequence;
                 strcpy(display_line[2], " Sampling ");
                 display_changed = TRUE;
                 cal_sub_state   = CAL_ST_SAMPLE_WHITE;
@@ -190,9 +198,9 @@ void Calibration_Tick(void){
             break;
 
         case CAL_ST_SAMPLE_WHITE:
-            // Spin main-loop iterations to let the ADC settle on the new surface.
-            // At ~8000 iter/s, 8000 = ~1 s.
-            if(++cal_settle_cnt > 8000){
+            // Deterministic 1 s settle based on Timer B0 CCR0 (200 ms ticks).
+            // Matches Project 7's CAL_SAMPLE_DELAY flow exactly.
+            if((unsigned int)(Time_Sequence - cal_start_tick) >= CAL_SETTLE_TICKS){
                 white_left  = ADC_Left_Detect;
                 white_right = ADC_Right_Detect;
                 USB_transmit_string("CAL white captured\r\n");
@@ -213,7 +221,7 @@ void Calibration_Tick(void){
         case CAL_ST_WAIT_BLACK:
             if(sw1_pressed){
                 sw1_pressed    = 0;
-                cal_settle_cnt = 0;
+                cal_start_tick = Time_Sequence;
                 strcpy(display_line[2], " Sampling ");
                 display_changed = TRUE;
                 cal_sub_state   = CAL_ST_SAMPLE_BLACK;
@@ -221,7 +229,7 @@ void Calibration_Tick(void){
             break;
 
         case CAL_ST_SAMPLE_BLACK:
-            if(++cal_settle_cnt > 8000){
+            if((unsigned int)(Time_Sequence - cal_start_tick) >= CAL_SETTLE_TICKS){
                 black_left  = ADC_Left_Detect;
                 black_right = ADC_Right_Detect;
 
@@ -232,17 +240,16 @@ void Calibration_Tick(void){
                 calibration_done = 1;
                 USB_transmit_string("CAL done\r\n");
 
-                cal_sub_state = CAL_ST_FINISH;
-                cal_settle_cnt = 0;
+                cal_sub_state  = CAL_ST_FINISH;
+                cal_start_tick = Time_Sequence;
             }
             break;
 
         case CAL_ST_FINISH:
-            // Show the 4 captured values on the LCD for a few seconds so the
-            // user can verify them before returning to the IP layout.
+            // Show the 4 captured values on the LCD for ~5 s before returning
+            // to the IP layout.  25 ticks * 200 ms = 5 s.
             lcd_show_cal_values();
-            // ~5 s of main-loop iterations at ~8000 iter/s
-            if(++cal_settle_cnt > 40000){
+            if((unsigned int)(Time_Sequence - cal_start_tick) >= 25){
                 mode_cal_active = 0;
                 Display_Network_Info();
             }
