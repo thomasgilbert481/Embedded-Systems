@@ -115,6 +115,13 @@ static void lcd_write_value(unsigned int line_idx, const char *label, unsigned i
 }
 
 //------------------------------------------------------------------------------
+// Line-follow LCD update counters (declared early so Line_Follow_Start can
+// reset the counter to force an immediate redraw).
+//------------------------------------------------------------------------------
+static unsigned long line_dbg_cnt = 0;
+#define LINE_DBG_INTERVAL 2000
+
+//------------------------------------------------------------------------------
 // Show all four calibration values on the LCD (used at end of cal)
 //------------------------------------------------------------------------------
 static void lcd_show_cal_values(void){
@@ -308,10 +315,9 @@ void Line_Follow_Start(unsigned int seconds){
 //   Line 1: "R :dddd   "  raw right ADC
 //   Line 2: "Ln:dddd   "  left  normalized [0,100]
 //   Line 3: "Rn:dddd   "  right normalized [0,100]
+// (line_dbg_cnt / LINE_DBG_INTERVAL declared above so Line_Follow_Start can
+// force an immediate redraw.)
 //------------------------------------------------------------------------------
-static unsigned long line_dbg_cnt = 0;
-#define LINE_DBG_INTERVAL 2000
-
 static void line_follow_display(int left_norm, int right_norm){
     if(++line_dbg_cnt < LINE_DBG_INTERVAL){
         return;
