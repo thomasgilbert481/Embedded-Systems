@@ -163,13 +163,21 @@
 #define CMD_PAYLOAD_LEN     (10)       // ^ + 4 PIN + 1 dir + 4 time
 
 //------------------------------------------------------------------------------
-// Line following / calibration constants
+// Line following / calibration constants -- values and names copied from
+// Project 7 where this tuning was done on hardware.
 //------------------------------------------------------------------------------
 #define LINE_FOLLOW_DEFAULT_SECONDS (30)   // Default if ^..N0000 sent with 0 time
-#define CAL_SAMPLE_DELAY_MS         (1000) // Hold each surface for ~1 s after SW1
-#define LINE_FOLLOW_BASE_SPEED      (25000) // ~50% duty straight
-#define LINE_FOLLOW_KP              (100)   // Proportional gain
-#define LINE_FOLLOW_MAX_PWM         (32000) // Clamp (must fit in signed int)
+#define CAL_SAMPLE_DELAY_MS         (1000) // Hold each surface ~1 s after SW1
+
+#define FOLLOW_BASE                 (25000) // Base PWM: ~50% duty (TUNED)
+#define FOLLOW_KP                   (100)   // Proportional gain (TUNED)
+#define FOLLOW_MAX_PWM              (32000) // Safe PID output ceiling
+
+// Extra speed presets carried over from Project 7 in case you want them later
+#define FOLLOW_FAST                 (35000) // ~70% duty straight-ahead burst
+#define FOLLOW_SPEED                (25000) // ~50% duty normal following
+#define FOLLOW_SLOW                 (20000) // ~40% duty inner-wheel correction
+#define FOLLOW_SEARCH               (25000) // ~50% duty both-off search/recovery
 
 //------------------------------------------------------------------------------
 // Motor command countdown -- decrement step in CCR0 ISR (every 200 ms)

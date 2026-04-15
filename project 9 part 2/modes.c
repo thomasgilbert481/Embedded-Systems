@@ -283,15 +283,15 @@ void Line_Follow_Tick(void){
     }
 
     error      = right_norm - left_norm;
-    correction = LINE_FOLLOW_KP * error;
+    correction = FOLLOW_KP * error;
 
-    left_speed  = (int)LINE_FOLLOW_BASE_SPEED + correction;
-    right_speed = (int)LINE_FOLLOW_BASE_SPEED - correction;
+    left_speed  = (int)FOLLOW_BASE + correction;
+    right_speed = (int)FOLLOW_BASE - correction;
 
     if(left_speed  < 0)                       left_speed  = 0;
     if(right_speed < 0)                       right_speed = 0;
-    if(left_speed  > (int)LINE_FOLLOW_MAX_PWM) left_speed  = (int)LINE_FOLLOW_MAX_PWM;
-    if(right_speed > (int)LINE_FOLLOW_MAX_PWM) right_speed = (int)LINE_FOLLOW_MAX_PWM;
+    if(left_speed  > (int)FOLLOW_MAX_PWM) left_speed  = (int)FOLLOW_MAX_PWM;
+    if(right_speed > (int)FOLLOW_MAX_PWM) right_speed = (int)FOLLOW_MAX_PWM;
 
     // Drive forward only -- clear reverse channels first (safety)
     LEFT_REVERSE_SPEED  = 0;
