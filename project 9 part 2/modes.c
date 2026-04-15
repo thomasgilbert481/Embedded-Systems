@@ -255,7 +255,6 @@ void Calibration_Tick(void){
 
                 calibration_done = 1;
                 USB_transmit_string("CAL done\r\n");
-                dump_cal_values();   // Show everything we just captured
 
                 cal_sub_state = CAL_ST_FINISH;
                 cal_settle_cnt = 0;
