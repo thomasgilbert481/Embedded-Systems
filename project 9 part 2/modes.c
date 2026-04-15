@@ -61,30 +61,6 @@ extern volatile char          cmd_active_dir;
 extern volatile unsigned int  cmd_active_time;
 
 //------------------------------------------------------------------------------
-// Helper: print a decimal uint via USB_transmit_string
-//------------------------------------------------------------------------------
-static void usb_print_uint(unsigned int v){
-    char    buf[8];
-    char    out[9];
-    unsigned int i = 0;
-    unsigned int j;
-
-    if(v == 0){
-        buf[i++] = '0';
-    } else {
-        while(v > 0 && i < sizeof(buf)){
-            buf[i++] = (char)('0' + (v % 10));
-            v /= 10;
-        }
-    }
-    for(j = 0; j < i; j++){
-        out[j] = buf[i - 1 - j];
-    }
-    out[i] = SERIAL_NULL;
-    USB_transmit_string(out);
-}
-
-//------------------------------------------------------------------------------
 // Helper: write "AA:dddd  " into display_line[line_idx] where AA is a 2-char
 // label and dddd is a zero-padded 4-digit decimal value.  Pads to 10 chars.
 //------------------------------------------------------------------------------
