@@ -77,7 +77,6 @@ static void usb_print_uint(unsigned int v){
             v /= 10;
         }
     }
-    // reverse into null-terminated out[]
     for(j = 0; j < i; j++){
         out[j] = buf[i - 1 - j];
     }
@@ -85,20 +84,45 @@ static void usb_print_uint(unsigned int v){
     USB_transmit_string(out);
 }
 
-static void dump_cal_values(void){
-    USB_transmit_string("CAL WL=");
-    usb_print_uint(white_left);
-    USB_transmit_string(" WR=");
-    usb_print_uint(white_right);
-    USB_transmit_string(" BL=");
-    usb_print_uint(black_left);
-    USB_transmit_string(" BR=");
-    usb_print_uint(black_right);
-    USB_transmit_string(" TL=");
-    usb_print_uint(threshold_left);
-    USB_transmit_string(" TR=");
-    usb_print_uint(threshold_right);
-    USB_transmit_string("\r\n");
+//------------------------------------------------------------------------------
+// Helper: write "AA:dddd  " into display_line[line_idx] where AA is a 2-char
+// label and dddd is a zero-padded 4-digit decimal value.  Pads to 10 chars.
+//------------------------------------------------------------------------------
+static void lcd_write_value(unsigned int line_idx, const char *label, unsigned int value){
+    unsigned int thousands, hundreds, tens, ones;
+
+    if(line_idx > 3) return;
+
+    // Clamp to 4 digits
+    if(value > 9999) value = 9999;
+
+    thousands = value / 1000;        value -= thousands * 1000;
+    hundreds  = value / 100;         value -= hundreds  * 100;
+    tens      = value / 10;          value -= tens      * 10;
+    ones      = value;
+
+    display_line[line_idx][0] = label[0];
+    display_line[line_idx][1] = label[1];
+    display_line[line_idx][2] = ':';
+    display_line[line_idx][3] = (char)('0' + thousands);
+    display_line[line_idx][4] = (char)('0' + hundreds);
+    display_line[line_idx][5] = (char)('0' + tens);
+    display_line[line_idx][6] = (char)('0' + ones);
+    display_line[line_idx][7] = ' ';
+    display_line[line_idx][8] = ' ';
+    display_line[line_idx][9] = ' ';
+    display_line[line_idx][10] = SERIAL_NULL;
+}
+
+//------------------------------------------------------------------------------
+// Show all four calibration values on the LCD (used at end of cal)
+//------------------------------------------------------------------------------
+static void lcd_show_cal_values(void){
+    lcd_write_value(0, "WL", white_left);
+    lcd_write_value(1, "WR", white_right);
+    lcd_write_value(2, "BL", black_left);
+    lcd_write_value(3, "BR", black_right);
+    display_changed = TRUE;
 }
 
 //------------------------------------------------------------------------------
@@ -232,13 +256,11 @@ void Calibration_Tick(void){
             break;
 
         case CAL_ST_FINISH:
-            strcpy(display_line[0], "  Cal OK  ");
-            strcpy(display_line[1], "          ");
-            strcpy(display_line[2], "          ");
-            strcpy(display_line[3], "          ");
-            display_changed = TRUE;
-            // Leave "Cal OK" visible briefly, then back to IP layout
-            if(++cal_settle_cnt > 4000){
+            // Show the 4 captured values on the LCD for a few seconds so the
+            // user can verify them before returning to the IP layout.
+            lcd_show_cal_values();
+            // ~5 s of main-loop iterations at ~8000 iter/s
+            if(++cal_settle_cnt > 40000){
                 mode_cal_active = 0;
                 Display_Network_Info();
             }
@@ -274,38 +296,32 @@ void Line_Follow_Start(unsigned int seconds){
     cmd_active_time  = seconds * 10;        // record in time-units
     cmd_remaining_ms = seconds * 1000u;     // ms
     mode_line_active = 1;
+    line_dbg_cnt     = LINE_DBG_INTERVAL;   // force first LCD update right away
 
     USB_transmit_string("LINE start\r\n");
-    dump_cal_values();   // Show values being used
 }
 
 //------------------------------------------------------------------------------
-// Periodic ADC dump during line-follow (every ~0.5 s of main-loop ticks)
+// Periodic LCD update during line-follow.  Every ~0.25 s of main-loop ticks
+// redraw the four lines with current ADC readings and normalized values:
+//   Line 0: "L :dddd   "  raw left  ADC
+//   Line 1: "R :dddd   "  raw right ADC
+//   Line 2: "Ln:dddd   "  left  normalized [0,100]
+//   Line 3: "Rn:dddd   "  right normalized [0,100]
 //------------------------------------------------------------------------------
 static unsigned long line_dbg_cnt = 0;
-#define LINE_DBG_INTERVAL 4000
+#define LINE_DBG_INTERVAL 2000
 
-static void line_follow_debug(int left_norm, int right_norm, int correction){
+static void line_follow_display(int left_norm, int right_norm){
     if(++line_dbg_cnt < LINE_DBG_INTERVAL){
         return;
     }
     line_dbg_cnt = 0;
-    USB_transmit_string("L=");
-    usb_print_uint(ADC_Left_Detect);
-    USB_transmit_string(" R=");
-    usb_print_uint(ADC_Right_Detect);
-    USB_transmit_string(" Ln=");
-    usb_print_uint((unsigned int)left_norm);
-    USB_transmit_string(" Rn=");
-    usb_print_uint((unsigned int)right_norm);
-    USB_transmit_string(" corr=");
-    if(correction < 0){
-        USB_transmit_string("-");
-        usb_print_uint((unsigned int)(-correction));
-    } else {
-        usb_print_uint((unsigned int)correction);
-    }
-    USB_transmit_string("\r\n");
+    lcd_write_value(0, "L ", ADC_Left_Detect);
+    lcd_write_value(1, "R ", ADC_Right_Detect);
+    lcd_write_value(2, "Ln", (unsigned int)(left_norm  < 0 ? 0 : left_norm));
+    lcd_write_value(3, "Rn", (unsigned int)(right_norm < 0 ? 0 : right_norm));
+    display_changed = TRUE;
 }
 
 //==============================================================================
@@ -329,6 +345,7 @@ void Line_Follow_Tick(void){
     if(cmd_remaining_ms == 0){
         // Countdown expired -- Vehicle_Cmd_Tick already stopped motors.
         mode_line_active = 0;
+        Display_Network_Info();   // Restore IP layout on the LCD
         return;
     }
 
@@ -357,7 +374,7 @@ void Line_Follow_Tick(void){
     error      = right_norm - left_norm;
     correction = FOLLOW_KP * error;
 
-    line_follow_debug(left_norm, right_norm, correction);
+    line_follow_display(left_norm, right_norm);
 
     left_speed  = (int)FOLLOW_BASE + correction;
     right_speed = (int)FOLLOW_BASE - correction;
