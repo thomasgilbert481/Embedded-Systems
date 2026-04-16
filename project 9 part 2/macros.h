@@ -189,6 +189,20 @@
 #define FOLLOW_SPEED                (25000) // Straight drive speed (F/B/L/R)
 
 //------------------------------------------------------------------------------
+// Line-follow anti-jitter knobs.
+//   LF_OFF_LINE_CONFIRM  -- how many consecutive Line_Follow_Tick passes
+//                           must show BOTH sensors below threshold before
+//                           we enter reverse-reacquire.  Prevents a single
+//                           noise dip from kicking the car into reverse.
+//   LF_ERR_DEADBAND      -- if |left_reading - right_reading| is smaller
+//                           than this, treat err/d_err as zero and just
+//                           drive straight at BASE.  Avoids twitchy
+//                           corrections when the car is centered on the line.
+//------------------------------------------------------------------------------
+#define LF_OFF_LINE_CONFIRM         (3)
+#define LF_ERR_DEADBAND             (150)
+
+//------------------------------------------------------------------------------
 // Line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
 // Project_7 uses 5 ms ticks and 200-tick values (1 s); we use 200 ms ticks and
 // 5-tick values (1 s) for the same behaviour.

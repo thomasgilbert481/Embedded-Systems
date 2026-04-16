@@ -282,6 +282,7 @@ static unsigned char lf_sub_state  = LF_SEEK;
 static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase began
 static unsigned char lf_spin_cw    = 0;         // 1 = left sensor saw line first
 static int           lf_last_error = 0;         // PD state: previous error term
+static unsigned int  lf_off_line_cnt = 0;       // Debounce counter for "both off line"
 
 void Line_Follow_Start(unsigned int seconds){
     if(!calibration_done){
@@ -429,13 +430,15 @@ void Line_Follow_Tick(void){
             // Both sensors already on the line -- done aligning.
             Wheels_All_Off();
             USB_transmit_string("LINE follow\r\n");
-            lf_last_error = 0;          // reset PD state
+            lf_last_error    = 0;       // reset PD state
+            lf_off_line_cnt  = 0;       // reset debounce
             lf_sub_state  = LF_FOLLOW;
             lf_phase_tick = Time_Sequence;
         } else if(phase_elapsed >= P7_INITIAL_TURN_TIME){
             Wheels_All_Off();
             USB_transmit_string("LINE follow\r\n");
-            lf_last_error = 0;
+            lf_last_error    = 0;
+            lf_off_line_cnt  = 0;
             lf_sub_state  = LF_FOLLOW;
             lf_phase_tick = Time_Sequence;
         }
@@ -459,31 +462,58 @@ void Line_Follow_Tick(void){
         unsigned int right_on_line = (ADC_Right_Detect > threshold_right);
         int base_err;
         int delta_err;
+        int abs_err;
 
         // Show raw ADC values on LCD at the display rate
-        line_follow_display(0, 0);  // args unused for this scheme
+        line_follow_display(0, 0);
 
+        //----------------------------------------------------------------------
+        // Hysteresis: only trigger reverse-reacquire if BOTH sensors have been
+        // below threshold for LF_OFF_LINE_CONFIRM consecutive passes.  A single
+        // noise-induced dip does not flip the car into reverse.
+        //----------------------------------------------------------------------
         if(!left_on_line && !right_on_line){
-            // Both off line -- reverse to re-find it.  H-bridge mutex: clear
-            // forward pins first for each wheel.
-            LEFT_FORWARD_SPEED  = WHEEL_OFF;
-            LEFT_REVERSE_SPEED  = REVERSE_SPEED;
-            RIGHT_FORWARD_SPEED = WHEEL_OFF;
-            RIGHT_REVERSE_SPEED = REVERSE_SPEED;
-            // Do NOT update lf_last_error -- preserve for re-acquisition
+            lf_off_line_cnt++;
+            if(lf_off_line_cnt >= LF_OFF_LINE_CONFIRM){
+                // Confirmed off the line -- reverse.
+                LEFT_FORWARD_SPEED  = WHEEL_OFF;
+                LEFT_REVERSE_SPEED  = REVERSE_SPEED;
+                RIGHT_FORWARD_SPEED = WHEEL_OFF;
+                RIGHT_REVERSE_SPEED = REVERSE_SPEED;
+                // Preserve lf_last_error for cleaner PD resume on re-acquire
+                break;
+            }
+            // Debounce window -- leave motors at whatever they were doing
+            // so we don't stutter while noise dips through.
             break;
         }
+        // At least one sensor is clearly on the line -- reset debounce.
+        lf_off_line_cnt = 0;
 
-        // At least one sensor sees the line -- PD forward control.
-        base_err   = left_reading - right_reading;
-        delta_err  = base_err - lf_last_error;
-        lf_last_error = base_err;
+        //----------------------------------------------------------------------
+        // Deadband: if the sensor difference is small enough that we're
+        // essentially centered on the line, drive straight at BASE instead of
+        // amplifying ADC noise into jerky PD corrections.
+        //----------------------------------------------------------------------
+        base_err = left_reading - right_reading;
+        abs_err  = (base_err < 0) ? -base_err : base_err;
 
-        correction = (KP_VALUE * base_err) + (KD_VALUE * delta_err);
-        correction = correction / PD_SCALE_DIVISOR;
+        if(abs_err < LF_ERR_DEADBAND){
+            // Centered -- just drive straight.  Zero the PD state so when a
+            // real error reappears the derivative doesn't jump.
+            lf_last_error = 0;
+            left_speed  = (int)BASE_FOLLOW_SPEED;
+            right_speed = (int)BASE_FOLLOW_SPEED;
+        } else {
+            delta_err  = base_err - lf_last_error;
+            lf_last_error = base_err;
 
-        left_speed  = (int)BASE_FOLLOW_SPEED - correction;
-        right_speed = (int)BASE_FOLLOW_SPEED + correction;
+            correction = (KP_VALUE * base_err) + (KD_VALUE * delta_err);
+            correction = correction / PD_SCALE_DIVISOR;
+
+            left_speed  = (int)BASE_FOLLOW_SPEED - correction;
+            right_speed = (int)BASE_FOLLOW_SPEED + correction;
+        }
 
         if(left_speed  < 0)                         left_speed  = 0;
         if(right_speed < 0)                         right_speed = 0;
