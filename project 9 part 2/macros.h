@@ -171,30 +171,30 @@
 #define LINE_FOLLOW_DEFAULT_SECONDS (30)   // Default if ^..N0000 sent with 0 time
 #define CAL_SAMPLE_DELAY_MS         (1000) // Hold each surface ~1 s after SW1
 
-#define FOLLOW_BASE                 (18000) // Base PWM: ~36% duty (slower than
-                                            // P7's 25000 so there's time to correct)
-#define FOLLOW_KP                   (150)   // Proportional gain -- middle ground
-                                            // between P7's 100 (too gentle for
-                                            // two-wheel drive) and 300 (caused
-                                            // motor chatter / stall)
-#define FOLLOW_MAX_PWM              (32000) // Safe PID output ceiling
-
-// Extra speed presets carried over from Project 7 in case you want them later
-#define FOLLOW_FAST                 (35000) // ~70% duty straight-ahead burst
-#define FOLLOW_SPEED                (25000) // ~50% duty normal following
-#define FOLLOW_SLOW                 (20000) // ~40% duty inner-wheel correction
-#define FOLLOW_SEARCH               (25000) // ~50% duty both-off search/recovery
+//------------------------------------------------------------------------------
+// Line-follow PD control (ported verbatim from working Project_7/Follow_Line):
+//   correction = (KP*err + KD*d_err) / PD_SCALE_DIVISOR
+//   left  = BASE - correction
+//   right = BASE + correction
+// When BOTH sensors are OFF the line: drive in REVERSE at REVERSE_SPEED to
+// reacquire (P7's key behaviour -- prevents the car drifting off forever).
+//------------------------------------------------------------------------------
+#define KP_VALUE                    (1)
+#define KD_VALUE                    (5)
+#define PD_SCALE_DIVISOR            (10)
+#define BASE_FOLLOW_SPEED           (20000) // Nominal PD following speed
+#define MAX_FOLLOW_SPEED            (35000) // Max after PD correction
+#define REVERSE_SPEED               (15000) // Reverse when line lost
+#define SPIN_SPEED                  (20000) // Spin turn speed (Spin_CW/CCW)
+#define FOLLOW_SPEED                (25000) // Straight drive speed (F/B/L/R)
 
 //------------------------------------------------------------------------------
-// Project-7 line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
-// NOTE: P7_INITIAL_TURN_TIME was 5 ticks (1 s) in Project 7 where P6.1 was
-// dead so Spin_CW_On was effectively a single-wheel pivot.  In P9P2 both
-// wheels drive in opposite directions -- true in-place spin, ~4x faster --
-// so 1 s is a full 180°+.  Reduced to 2 ticks (0.4 s) to match the angular
-// rotation P7's pivot produced.  TUNE ON HARDWARE.
+// Line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
+// Project_7 uses 5 ms ticks and 200-tick values (1 s); we use 200 ms ticks and
+// 5-tick values (1 s) for the same behaviour.
 //------------------------------------------------------------------------------
 #define P7_DETECT_STOP_TIME         (5)     // 1 s pause after line detection
-#define P7_INITIAL_TURN_TIME        (2)     // 0.4 s spin -- tune for ~45-90°
+#define P7_INITIAL_TURN_TIME        (5)     // 1 s alignment spin (tune if needed)
 #define LF_SEEK_GUARD_TICKS         (3)     // Ignore sensors for first 0.6 s
                                             // after entering LF_SEEK
 

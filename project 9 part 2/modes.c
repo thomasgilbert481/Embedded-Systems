@@ -281,6 +281,7 @@ void Calibration_Tick(void){
 static unsigned char lf_sub_state  = LF_SEEK;
 static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase began
 static unsigned char lf_spin_cw    = 0;         // 1 = left sensor saw line first
+static int           lf_last_error = 0;         // PD state: previous error term
 
 void Line_Follow_Start(unsigned int seconds){
     if(!calibration_done){
@@ -327,24 +328,24 @@ void Line_Follow_Start(unsigned int seconds){
 }
 
 //------------------------------------------------------------------------------
-// Periodic LCD update during line-follow.  Every ~0.25 s of main-loop ticks
-// redraw the four lines with current ADC readings and normalized values:
+// Periodic LCD update during line-follow.  Every ~0.25 s redraw the four
+// lines with current ADC readings and their calibrated thresholds:
 //   Line 0: "L :dddd   "  raw left  ADC
 //   Line 1: "R :dddd   "  raw right ADC
-//   Line 2: "Ln:dddd   "  left  normalized [0,100]
-//   Line 3: "Rn:dddd   "  right normalized [0,100]
-// (line_dbg_cnt / LINE_DBG_INTERVAL declared above so Line_Follow_Start can
-// force an immediate redraw.)
+//   Line 2: "TL:dddd   "  left  threshold (line detected if L > TL)
+//   Line 3: "TR:dddd   "  right threshold (line detected if R > TR)
 //------------------------------------------------------------------------------
-static void line_follow_display(int left_norm, int right_norm){
+static void line_follow_display(int unused_l, int unused_r){
+    (void)unused_l;
+    (void)unused_r;
     if(++line_dbg_cnt < LINE_DBG_INTERVAL){
         return;
     }
     line_dbg_cnt = 0;
     lcd_write_value(0, "L ", ADC_Left_Detect);
     lcd_write_value(1, "R ", ADC_Right_Detect);
-    lcd_write_value(2, "Ln", (unsigned int)(left_norm  < 0 ? 0 : left_norm));
-    lcd_write_value(3, "Rn", (unsigned int)(right_norm < 0 ? 0 : right_norm));
+    lcd_write_value(2, "TL", threshold_left);
+    lcd_write_value(3, "TR", threshold_right);
     display_changed = TRUE;
 }
 
@@ -360,11 +361,6 @@ static void line_follow_display(int left_norm, int right_norm){
 // Vehicle_Cmd_Tick handles the final motor stop when the timer expires.
 //==============================================================================
 void Line_Follow_Tick(void){
-    unsigned int left_range;
-    unsigned int right_range;
-    int  left_norm;
-    int  right_norm;
-    int  error;
     int  correction;
     int  left_speed;
     int  right_speed;
@@ -422,64 +418,84 @@ void Line_Follow_Tick(void){
         break;
 
     //--------------------------------------------------------------------------
-    // LF_ALIGN -- P7_TURNING equivalent.  Spin for ~1 s to line both sensors
-    // up over the line, then start proportional follow.
+    // LF_ALIGN -- P7_TURNING equivalent.  Spin to center the line between
+    // the two sensors.  EARLY EXIT: if both sensors cross their thresholds
+    // (both on line) before the time limit, stop immediately.  Otherwise
+    // fall back to the P7_INITIAL_TURN_TIME timeout.
     //--------------------------------------------------------------------------
     case LF_ALIGN:
-        if(phase_elapsed >= P7_INITIAL_TURN_TIME){
+        if((ADC_Left_Detect  > threshold_left) &&
+           (ADC_Right_Detect > threshold_right)){
+            // Both sensors already on the line -- done aligning.
             Wheels_All_Off();
             USB_transmit_string("LINE follow\r\n");
+            lf_last_error = 0;          // reset PD state
+            lf_sub_state  = LF_FOLLOW;
+            lf_phase_tick = Time_Sequence;
+        } else if(phase_elapsed >= P7_INITIAL_TURN_TIME){
+            Wheels_All_Off();
+            USB_transmit_string("LINE follow\r\n");
+            lf_last_error = 0;
             lf_sub_state  = LF_FOLLOW;
             lf_phase_tick = Time_Sequence;
         }
         break;
 
     //--------------------------------------------------------------------------
-    // LF_FOLLOW -- P7_FOLLOW_LINE, byte-for-byte.  Normalize -> proportional
-    // correction -> clamp -> write PWM with H-bridge mutex.
+    // LF_FOLLOW -- byte-for-byte port of Project_7/Follow_Line:
+    //   If BOTH sensors off the line -> reverse at REVERSE_SPEED (re-acquire).
+    //   Else PD forward:
+    //     err       = left_reading - right_reading
+    //     d_err     = err - lf_last_error
+    //     correction= (KP*err + KD*d_err) / PD_SCALE_DIVISOR
+    //     left      = BASE - correction  (clamped)
+    //     right     = BASE + correction  (clamped)
     //--------------------------------------------------------------------------
     case LF_FOLLOW:
-        left_range  = (black_left  > white_left)  ? (black_left  - white_left)  : 1;
-        right_range = (black_right > white_right) ? (black_right - white_right) : 1;
+    {
+        int left_reading  = (int)ADC_Left_Detect;
+        int right_reading = (int)ADC_Right_Detect;
+        unsigned int left_on_line  = (ADC_Left_Detect  > threshold_left);
+        unsigned int right_on_line = (ADC_Right_Detect > threshold_right);
+        int base_err;
+        int delta_err;
 
-        if(ADC_Left_Detect <= white_left){
-            left_norm = 0;
-        } else if(ADC_Left_Detect >= black_left){
-            left_norm = 100;
-        } else {
-            left_norm = (int)(((unsigned long)(ADC_Left_Detect - white_left) * 100UL)
-                              / (unsigned long)left_range);
+        // Show raw ADC values on LCD at the display rate
+        line_follow_display(0, 0);  // args unused for this scheme
+
+        if(!left_on_line && !right_on_line){
+            // Both off line -- reverse to re-find it.  H-bridge mutex: clear
+            // forward pins first for each wheel.
+            LEFT_FORWARD_SPEED  = WHEEL_OFF;
+            LEFT_REVERSE_SPEED  = REVERSE_SPEED;
+            RIGHT_FORWARD_SPEED = WHEEL_OFF;
+            RIGHT_REVERSE_SPEED = REVERSE_SPEED;
+            // Do NOT update lf_last_error -- preserve for re-acquisition
+            break;
         }
 
-        if(ADC_Right_Detect <= white_right){
-            right_norm = 0;
-        } else if(ADC_Right_Detect >= black_right){
-            right_norm = 100;
-        } else {
-            right_norm = (int)(((unsigned long)(ADC_Right_Detect - white_right) * 100UL)
-                               / (unsigned long)right_range);
-        }
+        // At least one sensor sees the line -- PD forward control.
+        base_err   = left_reading - right_reading;
+        delta_err  = base_err - lf_last_error;
+        lf_last_error = base_err;
 
-        error      = right_norm - left_norm;
-        correction = FOLLOW_KP * error;
+        correction = (KP_VALUE * base_err) + (KD_VALUE * delta_err);
+        correction = correction / PD_SCALE_DIVISOR;
 
-        line_follow_display(left_norm, right_norm);
+        left_speed  = (int)BASE_FOLLOW_SPEED - correction;
+        right_speed = (int)BASE_FOLLOW_SPEED + correction;
 
-        left_speed  = (int)FOLLOW_BASE + correction;
-        right_speed = (int)FOLLOW_BASE - correction;
-
-        if(left_speed  < 0)                    left_speed  = 0;
-        if(right_speed < 0)                    right_speed = 0;
-        if(left_speed  > (int)FOLLOW_MAX_PWM)  left_speed  = (int)FOLLOW_MAX_PWM;
-        if(right_speed > (int)FOLLOW_MAX_PWM)  right_speed = (int)FOLLOW_MAX_PWM;
+        if(left_speed  < 0)                         left_speed  = 0;
+        if(right_speed < 0)                         right_speed = 0;
+        if(left_speed  > (int)MAX_FOLLOW_SPEED)     left_speed  = (int)MAX_FOLLOW_SPEED;
+        if(right_speed > (int)MAX_FOLLOW_SPEED)     right_speed = (int)MAX_FOLLOW_SPEED;
 
         // H-bridge mutex -- per wheel, clear reverse before writing forward.
         LEFT_REVERSE_SPEED  = WHEEL_OFF;
         LEFT_FORWARD_SPEED  = (unsigned int)left_speed;
-
         RIGHT_REVERSE_SPEED = WHEEL_OFF;
         RIGHT_FORWARD_SPEED = (unsigned int)right_speed;
-        break;
+    } break;
 
     default:
         // Shouldn't happen; bail safely.
