@@ -179,8 +179,16 @@
 // When BOTH sensors are OFF the line: drive in REVERSE at REVERSE_SPEED to
 // reacquire (P7's key behaviour -- prevents the car drifting off forever).
 //------------------------------------------------------------------------------
-#define KP_VALUE                    (1)
-#define KD_VALUE                    (5)
+// Project_7 used KP=1 because its right wheel was dead -- a tiny correction
+// on the single active wheel produced a big pivot.  In P9P2 both wheels
+// drive, so the same KP barely nudges the speed differential.  Scale up to
+// actually steer.  With err up to ~1000 and current KP=15 / DIVISOR=10,
+// err=500 -> correction=750 -> ~7.5% speed differential (left 12500 vs
+// right 27500 given BASE=20000).  Tune up for tighter curves, down for
+// less oscillation.
+#define KP_VALUE                    (15)
+#define KD_VALUE                    (30)    // proportional bump to KP to
+                                             // damp the sharper corrections
 #define PD_SCALE_DIVISOR            (10)
 #define BASE_FOLLOW_SPEED           (20000) // Nominal PD following speed
 #define MAX_FOLLOW_SPEED            (35000) // Max after PD correction
