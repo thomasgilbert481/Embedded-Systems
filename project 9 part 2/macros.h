@@ -163,14 +163,20 @@
 #define CMD_PAYLOAD_LEN     (10)       // ^ + 4 PIN + 1 dir + 4 time
 
 //------------------------------------------------------------------------------
-// Line following / calibration constants -- values and names copied from
-// Project 7 where this tuning was done on hardware.
+// Line following / calibration constants.
+// Values chosen for a two-wheel-driven car (Project 7's P6.1 was dead, so it
+// effectively ran on one wheel which gave sharper turning; here both wheels
+// drive so we bump KP and lower BASE to compensate).
 //------------------------------------------------------------------------------
 #define LINE_FOLLOW_DEFAULT_SECONDS (30)   // Default if ^..N0000 sent with 0 time
 #define CAL_SAMPLE_DELAY_MS         (1000) // Hold each surface ~1 s after SW1
 
-#define FOLLOW_BASE                 (25000) // Base PWM: ~50% duty (TUNED)
-#define FOLLOW_KP                   (100)   // Proportional gain (TUNED)
+#define FOLLOW_BASE                 (18000) // Base PWM: ~36% duty (slower than
+                                            // P7's 25000 so there's time to correct)
+#define FOLLOW_KP                   (150)   // Proportional gain -- middle ground
+                                            // between P7's 100 (too gentle for
+                                            // two-wheel drive) and 300 (caused
+                                            // motor chatter / stall)
 #define FOLLOW_MAX_PWM              (32000) // Safe PID output ceiling
 
 // Extra speed presets carried over from Project 7 in case you want them later
@@ -178,6 +184,19 @@
 #define FOLLOW_SPEED                (25000) // ~50% duty normal following
 #define FOLLOW_SLOW                 (20000) // ~40% duty inner-wheel correction
 #define FOLLOW_SEARCH               (25000) // ~50% duty both-off search/recovery
+
+//------------------------------------------------------------------------------
+// Project-7 line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
+// NOTE: P7_INITIAL_TURN_TIME was 5 ticks (1 s) in Project 7 where P6.1 was
+// dead so Spin_CW_On was effectively a single-wheel pivot.  In P9P2 both
+// wheels drive in opposite directions -- true in-place spin, ~4x faster --
+// so 1 s is a full 180°+.  Reduced to 2 ticks (0.4 s) to match the angular
+// rotation P7's pivot produced.  TUNE ON HARDWARE.
+//------------------------------------------------------------------------------
+#define P7_DETECT_STOP_TIME         (5)     // 1 s pause after line detection
+#define P7_INITIAL_TURN_TIME        (2)     // 0.4 s spin -- tune for ~45-90°
+#define LF_SEEK_GUARD_TICKS         (3)     // Ignore sensors for first 0.6 s
+                                            // after entering LF_SEEK
 
 //------------------------------------------------------------------------------
 // Motor command countdown -- decrement step in CCR0 ISR (every 200 ms)
