@@ -69,26 +69,28 @@ extern volatile unsigned int  cmd_active_time;
 // label and dddd is a zero-padded 4-digit decimal value.  Pads to 10 chars.
 //------------------------------------------------------------------------------
 static void lcd_write_value(unsigned int line_idx, const char *label, unsigned int value){
-    unsigned int thousands, hundreds, tens, ones;
+    unsigned int tenk, thousands, hundreds, tens, ones;
 
     if(line_idx > 3) return;
 
-    // Clamp to 4 digits
-    if(value > 9999) value = 9999;
+    // Clamp to 5 digits (so PWM speeds up to 65535 / BASE=22000 etc. show
+    // their real value instead of saturating at 9999).
+    if(value > 99999u) value = 99999u;
 
-    thousands = value / 1000;        value -= thousands * 1000;
-    hundreds  = value / 100;         value -= hundreds  * 100;
-    tens      = value / 10;          value -= tens      * 10;
+    tenk      = value / 10000u;      value -= tenk      * 10000u;
+    thousands = value / 1000u;       value -= thousands * 1000u;
+    hundreds  = value / 100u;        value -= hundreds  * 100u;
+    tens      = value / 10u;         value -= tens      * 10u;
     ones      = value;
 
     display_line[line_idx][0] = label[0];
     display_line[line_idx][1] = label[1];
     display_line[line_idx][2] = ':';
-    display_line[line_idx][3] = (char)('0' + thousands);
-    display_line[line_idx][4] = (char)('0' + hundreds);
-    display_line[line_idx][5] = (char)('0' + tens);
-    display_line[line_idx][6] = (char)('0' + ones);
-    display_line[line_idx][7] = ' ';
+    display_line[line_idx][3] = (char)('0' + tenk);
+    display_line[line_idx][4] = (char)('0' + thousands);
+    display_line[line_idx][5] = (char)('0' + hundreds);
+    display_line[line_idx][6] = (char)('0' + tens);
+    display_line[line_idx][7] = (char)('0' + ones);
     display_line[line_idx][8] = ' ';
     display_line[line_idx][9] = ' ';
     display_line[line_idx][10] = SERIAL_NULL;
@@ -370,18 +372,24 @@ void Line_Follow_Start(unsigned int seconds){
 }
 
 //------------------------------------------------------------------------------
-// Periodic LCD update during line-follow.  Every ~0.25 s redraw the four
-// lines with raw ADC readings and the commanded wheel speeds:
-//   Line 0: "L :dddd   "  raw left  ADC
-//   Line 1: "R :dddd   "  raw right ADC
-//   Line 2: "Ls:dddd   "  commanded left  PWM speed (what PD wrote)
-//   Line 3: "Rs:dddd   "  commanded right PWM speed
-// If Ls and Rs stay identical while the car is supposedly steering, the
-// controller is not producing differential output.  If they clearly differ
-// but the car still doesn't turn, the motors aren't responding.
+// Periodic LCD update during line-follow.  Every ~0.25 s redraw with the
+// diagnostic most useful for the current problem:
+//   Line 0: "Ln:ddddd   "  normalized left  sensor (0..100)
+//   Line 1: "Rn:ddddd   "  normalized right sensor (0..100)
+//   Line 2: "Ls:ddddd   "  commanded left  PWM speed
+//   Line 3: "Rs:ddddd   "  commanded right PWM speed
+//
+// Read this as:
+//   Ln==Rn==100 -> both sensors fully on line; controller sees no error
+//                  (this is why Ls and Rs came back identical -- the line
+//                  covers both sensors simultaneously).
+//   Ln and Rn differing as the car drifts -> PD can produce a correction.
+//   Ls != Rs -> PD IS outputting differential; watch the wheels.
 //------------------------------------------------------------------------------
 static unsigned int lf_last_left_spd  = 0;
 static unsigned int lf_last_right_spd = 0;
+static int          lf_last_ln        = 0;
+static int          lf_last_rn        = 0;
 
 static void line_follow_display(int unused_l, int unused_r){
     (void)unused_l;
@@ -390,8 +398,8 @@ static void line_follow_display(int unused_l, int unused_r){
         return;
     }
     line_dbg_cnt = 0;
-    lcd_write_value(0, "L ", ADC_Left_Detect);
-    lcd_write_value(1, "R ", ADC_Right_Detect);
+    lcd_write_value(0, "Ln", (unsigned int)(lf_last_ln < 0 ? 0 : lf_last_ln));
+    lcd_write_value(1, "Rn", (unsigned int)(lf_last_rn < 0 ? 0 : lf_last_rn));
     lcd_write_value(2, "Ls", lf_last_left_spd);
     lcd_write_value(3, "Rs", lf_last_right_spd);
     display_changed = TRUE;
@@ -569,6 +577,10 @@ void Line_Follow_Tick(void){
 
         base_err = left_norm - right_norm;            // range ~[-100, +100]
         abs_err  = (base_err < 0) ? -base_err : base_err;
+
+        // Snapshot for LCD
+        lf_last_ln = left_norm;
+        lf_last_rn = right_norm;
 
         if(abs_err < LF_ERR_DEADBAND){
             // Essentially centered on the line -- straight ahead.
