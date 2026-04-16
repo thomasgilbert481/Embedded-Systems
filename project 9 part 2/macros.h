@@ -179,36 +179,33 @@
 // When BOTH sensors are OFF the line: drive in REVERSE at REVERSE_SPEED to
 // reacquire (P7's key behaviour -- prevents the car drifting off forever).
 //------------------------------------------------------------------------------
-// Project_7 used KP=1 because its right wheel was dead -- a tiny correction
-// on the single active wheel produced a big pivot.  In P9P2 both wheels
-// drive, so the same KP barely nudges the speed differential.  Scale up to
-// actually steer.  With err up to ~1000 and current KP=15 / DIVISOR=10,
-// err=500 -> correction=750 -> ~7.5% speed differential (left 12500 vs
-// right 27500 given BASE=20000).  Tune up for tighter curves, down for
-// less oscillation.
-#define KP_VALUE                    (15)
-#define KD_VALUE                    (30)    // proportional bump to KP to
-                                             // damp the sharper corrections
+// Normalized PD: each sensor reading is scaled to [0, 100] using its own
+// calibrated white/black range, so err=0 truly means "both sensors equally
+// on the line" regardless of sensor mismatch (unlike raw ADC subtraction
+// which produces a permanent bias when BL != BR).  After normalization the
+// error range is ~[-100, +100] so KP/KD can be sized accordingly.
+#define KP_VALUE                    (300)
+#define KD_VALUE                    (600)
 #define PD_SCALE_DIVISOR            (10)
-#define BASE_FOLLOW_SPEED           (20000) // Nominal PD following speed
-#define MAX_FOLLOW_SPEED            (35000) // Max after PD correction
+#define BASE_FOLLOW_SPEED           (12000) // Nominal PD following speed (slower
+                                             // so corrections have more relative bite)
+#define MAX_FOLLOW_SPEED            (25000) // Max after PD correction
 #define REVERSE_SPEED               (15000) // Reverse when line lost
 #define SPIN_SPEED                  (20000) // Spin turn speed (Spin_CW/CCW)
 #define FOLLOW_SPEED                (25000) // Straight drive speed (F/B/L/R)
 
 //------------------------------------------------------------------------------
 // Line-follow anti-jitter knobs.
-//   LF_OFF_LINE_CONFIRM  -- how many consecutive Line_Follow_Tick passes
-//                           must show BOTH sensors below threshold before
-//                           we enter reverse-reacquire.  Prevents a single
-//                           noise dip from kicking the car into reverse.
-//   LF_ERR_DEADBAND      -- if |left_reading - right_reading| is smaller
-//                           than this, treat err/d_err as zero and just
-//                           drive straight at BASE.  Avoids twitchy
-//                           corrections when the car is centered on the line.
+//   LF_OFF_LINE_CONFIRM  -- consecutive Line_Follow_Tick passes with BOTH
+//                           sensors below threshold required before reverse-
+//                           reacquire fires.  Larger = less reverse stutter,
+//                           but slower to detect a real loss of the line.
+//   LF_ERR_DEADBAND      -- if |normalized error| (now in [0,100]) is smaller
+//                           than this, treat as centered and drive straight.
+//                           Set to 0 to disable.
 //------------------------------------------------------------------------------
-#define LF_OFF_LINE_CONFIRM         (3)
-#define LF_ERR_DEADBAND             (150)
+#define LF_OFF_LINE_CONFIRM         (10)
+#define LF_ERR_DEADBAND             (3)
 
 //------------------------------------------------------------------------------
 // Line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
