@@ -65,6 +65,17 @@ extern volatile char          cmd_active_dir;
 extern volatile unsigned int  cmd_active_time;
 
 //------------------------------------------------------------------------------
+// Forward declarations for static helpers defined later in this file.
+//------------------------------------------------------------------------------
+static void lf_enter_p7_pins(void);
+static void lf_exit_p7_pins(void);
+static void lf_motors_forward(unsigned int left, unsigned int right);
+static void lf_motors_reverse(unsigned int speed);
+static void lf_motors_stop(void);
+static void lf_motors_spin_cw(unsigned int speed);
+static void lf_motors_spin_ccw(unsigned int speed);
+
+//------------------------------------------------------------------------------
 // Helper: write "AA:dddd  " into display_line[line_idx] where AA is a 2-char
 // label and dddd is a zero-padded 4-digit decimal value.  Pads to 10 chars.
 //------------------------------------------------------------------------------
@@ -285,8 +296,8 @@ static unsigned char lf_sub_state  = LF_SEEK;
 static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase began
 static unsigned char lf_spin_cw    = 0;         // 1 = left sensor saw line first
 static int           lf_last_error = 0;         // PD state: previous error term
-static unsigned int  lf_off_line_cnt = 0;       // Debounce counter for "both off line"
-static char          lf_diag_mode   = ' ';      // 'P'=PD, 'R'=reverse-reacquire
+// (lf_off_line_cnt and lf_diag_mode were used by the old
+// normalized-PD implementation; Project_7's port doesn't need them.)
 
 void Line_Follow_Start(unsigned int seconds){
     if(!calibration_done){
@@ -525,15 +536,13 @@ void Line_Follow_Tick(void){
            (ADC_Right_Detect > threshold_right)){
             lf_motors_stop();
             USB_transmit_string("LINE follow\r\n");
-            lf_last_error    = 0;
-            lf_off_line_cnt  = 0;
+            lf_last_error = 0;
             lf_sub_state  = LF_FOLLOW;
             lf_phase_tick = Time_Sequence;
         } else if(phase_elapsed >= P7_INITIAL_TURN_TIME){
             lf_motors_stop();
             USB_transmit_string("LINE follow\r\n");
-            lf_last_error    = 0;
-            lf_off_line_cnt  = 0;
+            lf_last_error = 0;
             lf_sub_state  = LF_FOLLOW;
             lf_phase_tick = Time_Sequence;
         }
@@ -560,7 +569,6 @@ void Line_Follow_Tick(void){
             lf_motors_reverse(P7_REVERSE_SPEED);
             lf_last_left_spd  = 0;
             lf_last_right_spd = 0;
-            lf_diag_mode = 'R';
             // Do NOT update lf_last_error -- preserve for re-acquisition.
             break;
         }
@@ -588,7 +596,6 @@ void Line_Follow_Tick(void){
         lf_last_rn        = correction >= 0 ? correction : -correction;
         lf_last_left_spd  = (unsigned int)left_speed;
         lf_last_right_spd = (unsigned int)right_speed;
-        lf_diag_mode = 'P';
     } break;
 
     default:
