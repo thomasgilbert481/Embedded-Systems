@@ -5,22 +5,25 @@
 //------------------------------------------------------------------------------
 // Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins.
 //
-// Mapping aligned with the working reference implementation used by the
-// NProject 9 car kit (Noah Cartwright's code):
-//   TB3CCR1 --> P6.1  (unused on this car; LCD-backlight-dimming on some boards)
-//   TB3CCR2 --> P6.2  RIGHT FORWARD
-//   TB3CCR3 --> P6.3  LEFT  FORWARD
-//   TB3CCR4 --> P6.4  RIGHT REVERSE
-//   TB3CCR5 --> P6.5  LEFT  REVERSE
+// EMPIRICAL mapping verified from this car's F/B/R/L tests:
+//   P6.1 unused  (not routed on this PCB)
+//   P6.2 = LEFT  FORWARD  --> TB3CCR2   (matches Project 7 original)
+//   P6.3 = RIGHT FORWARD  --> TB3CCR3   (Project 7 mislabeled this as R_REVERSE,
+//                                        but empirically it drives right wheel fwd)
+//   P6.4 = LEFT  REVERSE  --> TB3CCR4   (matches Project 7 original)
+//   P6.5 = RIGHT REVERSE  --> TB3CCR5   (TB3.5, P7's right-reverse was on dead CCR1)
 //
-// NOTE: P6.5 must be selected as TB3 function (SEL0=1) in Init_Port6 for the
-// LEFT_REVERSE PWM to actually drive the pin -- the reference code leaves
-// P6.5 as GPIO input, which is a latent bug there.
+// This ordering ensures that writing to LEFT_FORWARD_SPEED actually drives the
+// physical left wheel -- critical for line-follow proportional steering to
+// apply its correction in the correct direction.
+//
+// P6.5 must be selected as TB3 function (SEL0=1) in Init_Port6 for LEFT_REVERSE
+// PWM to actually reach the pin.
 //------------------------------------------------------------------------------
-#define RIGHT_FORWARD_SPEED (TB3CCR2)  // P6.2
-#define LEFT_FORWARD_SPEED  (TB3CCR3)  // P6.3
-#define RIGHT_REVERSE_SPEED (TB3CCR4)  // P6.4
-#define LEFT_REVERSE_SPEED  (TB3CCR5)  // P6.5
+#define LEFT_FORWARD_SPEED  (TB3CCR2)  // P6.2
+#define RIGHT_FORWARD_SPEED (TB3CCR3)  // P6.3
+#define LEFT_REVERSE_SPEED  (TB3CCR4)  // P6.4
+#define RIGHT_REVERSE_SPEED (TB3CCR5)  // P6.5
 
 // Port 1 Pins
 #define RED_LED     (0x01) // P1.0 - Red LED
