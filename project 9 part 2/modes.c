@@ -162,7 +162,7 @@ void Calibration_Start(void){
     ir_emitter_on = 1;
 
     cal_sub_state   = CAL_ST_PROMPT_WHITE;
-    cal_settle_cnt  = 0;
+    cal_start_tick  = Time_Sequence;
     mode_cal_active = 1;
     USB_transmit_string("CAL start\r\n");
 }
