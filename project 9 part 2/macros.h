@@ -187,10 +187,14 @@
 
 //------------------------------------------------------------------------------
 // Project-7 line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
-// Copied directly from Project 7/macros.h so the behaviour is identical.
+// NOTE: P7_INITIAL_TURN_TIME was 5 ticks (1 s) in Project 7 where P6.1 was
+// dead so Spin_CW_On was effectively a single-wheel pivot.  In P9P2 both
+// wheels drive in opposite directions -- true in-place spin, ~4x faster --
+// so 1 s is a full 180°+.  Reduced to 2 ticks (0.4 s) to match the angular
+// rotation P7's pivot produced.  TUNE ON HARDWARE.
 //------------------------------------------------------------------------------
 #define P7_DETECT_STOP_TIME         (5)     // 1 s pause after line detection
-#define P7_INITIAL_TURN_TIME        (5)     // 1 s spin to align on the line
+#define P7_INITIAL_TURN_TIME        (2)     // 0.4 s spin -- tune for ~45-90°
 #define LF_SEEK_GUARD_TICKS         (3)     // Ignore sensors for first 0.6 s
                                             // after entering LF_SEEK
 

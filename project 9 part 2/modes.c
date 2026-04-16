@@ -288,6 +288,20 @@ void Line_Follow_Start(unsigned int seconds){
         return;
     }
 
+    // Wait for the DAC ramp to finish.  TB0CTL TBIE is cleared by the
+    // overflow ISR (interrupts_timers.c case 14) once DAC_data reaches
+    // DAC_Adjust -- that's when the motor buck-boost rail is at ~6V.
+    // If we start line-follow before the ramp is done, the SEEK/ALIGN
+    // phases run on ~2V which is too weak to overcome wheel friction,
+    // and when the ramp completes mid-sequence the motors suddenly
+    // jump to full torque -- produces the "spin past the line" symptom.
+    // Red LED is ON during ramp, OFF when done, so the user has a
+    // visible indicator too.
+    if(TB0CTL & TBIE){
+        USB_transmit_string("ERR: motor pwr ramping, wait for RED LED off\r\n");
+        return;
+    }
+
     Wheels_All_Off();
     mode_cal_active = 0;
 
