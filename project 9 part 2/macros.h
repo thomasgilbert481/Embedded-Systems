@@ -179,32 +179,35 @@
 // When BOTH sensors are OFF the line: drive in REVERSE at REVERSE_SPEED to
 // reacquire (P7's key behaviour -- prevents the car drifting off forever).
 //------------------------------------------------------------------------------
-// PD on RAW ADC difference (matches Project_7's working algorithm):
-//   error = ADC_Left - ADC_Right
-//   correction = (KP*error + KD*(error - last_error)) >> PD_SHIFT
-//   clamp correction to +/-MAX_CORRECTION
-//   left  = BASE - correction
-//   right = BASE + correction
+// Line-follow runs with Project_7's ORIGINAL pin and algorithm config.  The
+// line-follow state switches the Port 6 pin layout on entry and restores it
+// on exit so that F/B/R/L commands (which use the current P9P2 mapping)
+// are unaffected.  Direct TB3CCRn writes are used during line-follow so
+// the speed macros in ports.h don't interfere.
 //
-// Raw ADC range is 12-bit (0..4095) so error spans +/-4095.  The shift
-// scales that into a reasonable PWM correction band.  MAX_CORRECTION
-// bounds the differential so one wheel never drops below the motor's
-// stall threshold and the other doesn't saturate.
+// Project_7 motor wiring (this car):
+//   CCR1 -> P6.1 RIGHT_FORWARD  (dead on this car; writes are harmless)
+//   CCR2 -> P6.2 LEFT_FORWARD
+//   CCR3 -> P6.3 RIGHT_REVERSE
+//   CCR4 -> P6.4 LEFT_REVERSE
+//   P6.5 is GPIO input during line-follow, TB3.5 output otherwise
 //
-// Tune in this order:
-//   1) Set KD=0, BASE_SPEED moderate, raise KP until the car visibly
-//      steers but oscillates.
-//   2) Raise KD (typically 2-4x KP) until oscillation damps.
-//   3) Push BASE_SPEED up if the car's too slow, retune if it over-runs
-//      curves.
-#define KP_VALUE                    (20)
-#define KD_VALUE                    (40)
-#define PD_SHIFT                    (4)     // correction >>= PD_SHIFT (= /16)
-#define BASE_FOLLOW_SPEED           (40000) // Nominal forward PWM
-#define MAX_CORRECTION              (8000)  // clamp on the per-wheel correction
-#define REVERSE_SPEED               (15000) // Reverse when line lost
-#define SPIN_SPEED                  (20000) // Spin turn speed (Spin_CW/CCW)
-#define FOLLOW_SPEED                (25000) // Straight drive speed (F/B/L/R)
+// Project_7 PD tuning (verbatim from the working reference):
+#define P7_KP                       (1)
+#define P7_KD                       (5)
+#define P7_PD_DIVISOR               (10)
+#define P7_BASE_SPEED               (20000) // Nominal forward PWM during follow
+#define P7_MAX_SPEED                (35000) // Per-wheel clamp
+#define P7_REVERSE_SPEED            (15000) // Reverse-reacquire PWM
+#define P7_SPIN_SPEED               (20000) // Spin turn PWM (align phase)
+
+// Speeds used by wheels.c for Forward_On/Reverse_On/Spin_CW/CCW (F/B/R/L
+// commands).  These run on the P9P2 pin mapping (CCR2-CCR5) -- completely
+// independent of the Project_7 line-follow values above.
+#define FOLLOW_SPEED                (25000)
+#define SPIN_SPEED                  (20000)
+#define REVERSE_SPEED               (15000) // currently unused by wheels.c but
+                                             // left defined for any future caller
 
 //------------------------------------------------------------------------------
 // Line-follow anti-jitter knobs.

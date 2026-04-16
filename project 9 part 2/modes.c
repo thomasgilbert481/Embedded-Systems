@@ -138,15 +138,15 @@ static unsigned int cal_start_tick = 0;  // Time_Sequence when sampling began
 //==============================================================================
 void Quit_Everything(void){
     Wheels_All_Off();
+    // If line-follow was active it may have been using the Project_7 pin
+    // layout; restore P9P2 pins so F/B/R/L commands work correctly after.
+    lf_exit_p7_pins();
     cmd_remaining_ms = 0;
     cmd_active_dir   = SERIAL_NULL;
     cmd_active_time  = 0;
     mode_cal_active  = 0;
     mode_line_active = 0;
-    // Clear LCD back to a known state; IP will be repainted once the state
-    // machine sees Display_Network_Info() is safe to re-call from main
     USB_transmit_string("QUIT\r\n");
-    // Repaint the network info LCD layout
     Display_Network_Info();
 }
 
@@ -311,6 +311,11 @@ void Line_Follow_Start(unsigned int seconds){
     Wheels_All_Off();
     mode_cal_active = 0;
 
+    // Switch Port 6 / CCR layout to Project_7's configuration.  Wheels_All_Off
+    // above cleared the P9P2 CCRs; lf_enter_p7_pins zeros them all again and
+    // reconfigures P6.5 as GPIO input.
+    lf_enter_p7_pins();
+
     P2OUT |= IR_LED;
     ir_emitter_on = 1;
 
@@ -323,22 +328,22 @@ void Line_Follow_Start(unsigned int seconds){
     cmd_remaining_ms = seconds * 1000u;     // ms
     mode_line_active = 1;
     line_dbg_cnt     = LINE_DBG_INTERVAL;   // force first LCD update right away
+    lf_last_error    = 0;
 
     // Begin with the SEEK phase (drive forward hunting for the line).
     lf_sub_state  = LF_SEEK;
     lf_phase_tick = Time_Sequence;
-    Forward_On();                            // Start driving forward
+    lf_motors_forward(P7_BASE_SPEED, P7_BASE_SPEED);
 
     USB_transmit_string("LINE seek\r\n");
 }
 
 //------------------------------------------------------------------------------
-// Periodic LCD update during line-follow.  Every ~0.25 s redraw with the
-// quantities that make the PD loop legible at a glance:
+// Periodic LCD update during line-follow.  Every ~0.25 s redraw with:
 //   Line 0: "Er:ddddd   "  |raw ADC error| = |ADC_L - ADC_R|
-//   Line 1: "Cr:ddddd   "  |post-shift/clamp correction|
-//   Line 2: "Ls:ddddd   "  commanded left  PWM speed
-//   Line 3: "Rs:ddddd   "  commanded right PWM speed
+//   Line 1: "Cr:ddddd   "  |computed PD correction|
+//   Line 2: "Ls:ddddd   "  left  PWM commanded via direct CCR write
+//   Line 3: "Rs:ddddd   "  right PWM commanded via direct CCR write
 //------------------------------------------------------------------------------
 static unsigned int lf_last_left_spd  = 0;
 static unsigned int lf_last_right_spd = 0;
@@ -357,6 +362,88 @@ static void line_follow_display(int unused_l, int unused_r){
     lcd_write_value(2, "Ls", lf_last_left_spd);
     lcd_write_value(3, "Rs", lf_last_right_spd);
     display_changed = TRUE;
+}
+
+//------------------------------------------------------------------------------
+// Pin / CCR mode switch.  Line-follow uses Project_7's layout; everything else
+// (F/B/R/L via wheels.c) uses the P9P2 layout.  The switch happens at
+// Line_Follow_Start entry and at Line_Follow_Exit cleanup.
+//
+//   P9P2 layout (wheels.c operates on this):
+//     CCR1 = unused / dead      CCR2 = LEFT_FWD
+//     CCR3 = RIGHT_FWD          CCR4 = LEFT_REV
+//     CCR5 = RIGHT_REV           P6.5 is TB3.5 output
+//
+//   Project_7 layout (this file operates on this during line-follow):
+//     CCR1 = RIGHT_FWD (dead)   CCR2 = LEFT_FWD
+//     CCR3 = RIGHT_REV          CCR4 = LEFT_REV
+//     CCR5 = unused              P6.5 is GPIO input
+//------------------------------------------------------------------------------
+static void lf_enter_p7_pins(void){
+    // Stop everything first (both layouts' pins, defensively).
+    TB3CCR1 = 0;
+    TB3CCR2 = 0;
+    TB3CCR3 = 0;
+    TB3CCR4 = 0;
+    TB3CCR5 = 0;
+    // P6.5 -> GPIO input (Project_7 config).
+    P6SEL0 &= ~P6_5;
+    P6SEL1 &= ~P6_5;
+    P6OUT  &= ~P6_5;
+    P6DIR  &= ~P6_5;
+}
+
+static void lf_exit_p7_pins(void){
+    // Zero all CCRs so no leftover PWM blips when the P9P2 mapping resumes.
+    TB3CCR1 = 0;
+    TB3CCR2 = 0;
+    TB3CCR3 = 0;
+    TB3CCR4 = 0;
+    TB3CCR5 = 0;
+    // P6.5 -> TB3.5 output (P9P2 config; used for RIGHT_REVERSE).
+    P6SEL0 |=  P6_5;
+    P6SEL1 &= ~P6_5;
+    P6DIR  |=  P6_5;
+}
+
+//------------------------------------------------------------------------------
+// Direct-CCR motor helpers used DURING line-follow (Project_7 layout).
+// Each one writes CCR1..CCR4 with the H-bridge mutex preserved -- forward
+// and reverse pins of the same wheel are never both non-zero at the same
+// time.
+//------------------------------------------------------------------------------
+static void lf_motors_forward(unsigned int left, unsigned int right){
+    TB3CCR3 = 0;           // right reverse off first
+    TB3CCR4 = 0;           // left  reverse off first
+    TB3CCR1 = right;       // right forward (P6.1 -- dead on this car, harmless)
+    TB3CCR2 = left;        // left  forward
+}
+
+static void lf_motors_reverse(unsigned int speed){
+    TB3CCR1 = 0;           // forward off first
+    TB3CCR2 = 0;
+    TB3CCR3 = speed;       // right reverse
+    TB3CCR4 = speed;       // left  reverse
+}
+
+static void lf_motors_stop(void){
+    TB3CCR1 = 0; TB3CCR2 = 0; TB3CCR3 = 0; TB3CCR4 = 0;
+}
+
+static void lf_motors_spin_cw(unsigned int speed){
+    // Project_7 Spin_CW = LEFT_FWD + RIGHT_REV = CCR2 + CCR3
+    TB3CCR1 = 0;
+    TB3CCR4 = 0;
+    TB3CCR2 = speed;
+    TB3CCR3 = speed;
+}
+
+static void lf_motors_spin_ccw(unsigned int speed){
+    // Project_7 Spin_CCW = RIGHT_FWD + LEFT_REV = CCR1 + CCR4
+    TB3CCR2 = 0;
+    TB3CCR3 = 0;
+    TB3CCR1 = speed;
+    TB3CCR4 = speed;
 }
 
 //==============================================================================
@@ -381,6 +468,8 @@ void Line_Follow_Tick(void){
     }
     if(cmd_remaining_ms == 0){
         // Overall countdown expired -- Vehicle_Cmd_Tick already stopped motors.
+        // Restore the P9P2 pin layout so F/B/R/L work again.
+        lf_exit_p7_pins();
         mode_line_active = 0;
         Display_Network_Info();
         return;
@@ -417,9 +506,9 @@ void Line_Follow_Tick(void){
         if(phase_elapsed >= P7_DETECT_STOP_TIME){
             // Spin toward the side that saw the line (to center both sensors).
             if(lf_spin_cw){
-                Spin_CW_On();
+                lf_motors_spin_cw(P7_SPIN_SPEED);
             } else {
-                Spin_CCW_On();
+                lf_motors_spin_ccw(P7_SPIN_SPEED);
             }
             USB_transmit_string("LINE align\r\n");
             lf_sub_state  = LF_ALIGN;
@@ -428,23 +517,20 @@ void Line_Follow_Tick(void){
         break;
 
     //--------------------------------------------------------------------------
-    // LF_ALIGN -- P7_TURNING equivalent.  Spin to center the line between
-    // the two sensors.  EARLY EXIT: if both sensors cross their thresholds
-    // (both on line) before the time limit, stop immediately.  Otherwise
-    // fall back to the P7_INITIAL_TURN_TIME timeout.
+    // LF_ALIGN -- P7_TURNING equivalent.  Spin until both sensors cross
+    // threshold (early exit) or until P7_INITIAL_TURN_TIME elapses.
     //--------------------------------------------------------------------------
     case LF_ALIGN:
         if((ADC_Left_Detect  > threshold_left) &&
            (ADC_Right_Detect > threshold_right)){
-            // Both sensors already on the line -- done aligning.
-            Wheels_All_Off();
+            lf_motors_stop();
             USB_transmit_string("LINE follow\r\n");
-            lf_last_error    = 0;       // reset PD state
-            lf_off_line_cnt  = 0;       // reset debounce
+            lf_last_error    = 0;
+            lf_off_line_cnt  = 0;
             lf_sub_state  = LF_FOLLOW;
             lf_phase_tick = Time_Sequence;
         } else if(phase_elapsed >= P7_INITIAL_TURN_TIME){
-            Wheels_All_Off();
+            lf_motors_stop();
             USB_transmit_string("LINE follow\r\n");
             lf_last_error    = 0;
             lf_off_line_cnt  = 0;
@@ -454,92 +540,52 @@ void Line_Follow_Tick(void){
         break;
 
     //--------------------------------------------------------------------------
-    // LF_FOLLOW -- byte-for-byte port of Project_7/Follow_Line:
-    //   If BOTH sensors off the line -> reverse at REVERSE_SPEED (re-acquire).
-    //   Else PD forward:
-    //     err       = left_reading - right_reading
-    //     d_err     = err - lf_last_error
-    //     correction= (KP*err + KD*d_err) / PD_SCALE_DIVISOR
-    //     left      = BASE - correction  (clamped)
-    //     right     = BASE + correction  (clamped)
+    // LF_FOLLOW -- byte-for-byte port of Project_7/Follow_Line using direct
+    // CCR writes on the P7 pin layout.
     //--------------------------------------------------------------------------
     case LF_FOLLOW:
     {
-        // Hysteresis: the sensor is considered CLEARLY off the line only if
-        // its reading is below threshold by more than LF_LINE_LOST_MARGIN.
-        unsigned int left_on_line  = (ADC_Left_Detect  + LF_LINE_LOST_MARGIN
-                                       > threshold_left);
-        unsigned int right_on_line = (ADC_Right_Detect + LF_LINE_LOST_MARGIN
-                                       > threshold_right);
+        int left_reading  = (int)ADC_Left_Detect;
+        int right_reading = (int)ADC_Right_Detect;
+        unsigned int left_on_line  = (ADC_Left_Detect  > threshold_left);
+        unsigned int right_on_line = (ADC_Right_Detect > threshold_right);
         int base_err;
         int delta_err;
 
         // Refresh the LCD display (rate-limited internally).
         line_follow_display(0, 0);
 
-        //----------------------------------------------------------------------
-        // Reverse-reacquire (wide-line mode only).  Gated on LF_REVERSE_REACQUIRE.
-        //----------------------------------------------------------------------
-#if LF_REVERSE_REACQUIRE
+        // Both sensors off line -- reverse to re-find it (Project_7 behaviour).
         if(!left_on_line && !right_on_line){
-            lf_off_line_cnt++;
-            if(lf_off_line_cnt >= LF_OFF_LINE_CONFIRM){
-                LEFT_FORWARD_SPEED  = WHEEL_OFF;
-                LEFT_REVERSE_SPEED  = REVERSE_SPEED;
-                RIGHT_FORWARD_SPEED = WHEEL_OFF;
-                RIGHT_REVERSE_SPEED = REVERSE_SPEED;
-                lf_diag_mode = 'R';
-                break;
-            }
-            // Debounce window -- leave motors alone.
+            lf_motors_reverse(P7_REVERSE_SPEED);
+            lf_last_left_spd  = 0;
+            lf_last_right_spd = 0;
+            lf_diag_mode = 'R';
+            // Do NOT update lf_last_error -- preserve for re-acquisition.
             break;
         }
-        lf_off_line_cnt = 0;
-#else
-        (void)left_on_line;
-        (void)right_on_line;
-#endif
 
-        //----------------------------------------------------------------------
-        // PD on RAW ADC difference.  Only update on a fresh ADC sample so
-        // d_error is derived from genuinely new data.  Running PD faster
-        // than the ADC produces stale d_error that looks like noise.
-        //----------------------------------------------------------------------
-        if(!ADC_sample_ready){
-            // No new sample yet -- leave motor state unchanged.
-            break;
-        }
-        ADC_sample_ready = 0;
-
-        base_err      = (int)ADC_Left_Detect - (int)ADC_Right_Detect;
+        // At least one sensor sees the line -- PD forward control.
+        base_err      = left_reading - right_reading;
         delta_err     = base_err - lf_last_error;
         lf_last_error = base_err;
 
-        correction = (KP_VALUE * base_err) + (KD_VALUE * delta_err);
-        correction = correction >> PD_SHIFT;          // /16 via right shift
+        correction = (P7_KP * base_err) + (P7_KD * delta_err);
+        correction = correction / P7_PD_DIVISOR;
 
-        // Clamp the correction itself so one wheel never drops into stall
-        // territory and the other never saturates above CCR0.
-        if(correction >  (int)MAX_CORRECTION) correction =  (int)MAX_CORRECTION;
-        if(correction < -(int)MAX_CORRECTION) correction = -(int)MAX_CORRECTION;
+        left_speed  = (int)P7_BASE_SPEED - correction;
+        right_speed = (int)P7_BASE_SPEED + correction;
 
-        left_speed  = (int)BASE_FOLLOW_SPEED - correction;
-        right_speed = (int)BASE_FOLLOW_SPEED + correction;
+        if(left_speed  < 0)                    left_speed  = 0;
+        if(right_speed < 0)                    right_speed = 0;
+        if(left_speed  > (int)P7_MAX_SPEED)    left_speed  = (int)P7_MAX_SPEED;
+        if(right_speed > (int)P7_MAX_SPEED)    right_speed = (int)P7_MAX_SPEED;
 
-        // Defensive non-negative clamp (shouldn't trigger if MAX_CORRECTION
-        // is sized correctly relative to BASE_FOLLOW_SPEED).
-        if(left_speed  < 0) left_speed  = 0;
-        if(right_speed < 0) right_speed = 0;
-
-        // H-bridge mutex per wheel.
-        LEFT_REVERSE_SPEED  = WHEEL_OFF;
-        LEFT_FORWARD_SPEED  = (unsigned int)left_speed;
-        RIGHT_REVERSE_SPEED = WHEEL_OFF;
-        RIGHT_FORWARD_SPEED = (unsigned int)right_speed;
+        lf_motors_forward((unsigned int)left_speed, (unsigned int)right_speed);
 
         // Snapshot for LCD display
-        lf_last_ln = base_err >= 0 ? base_err : -base_err;   // show |err|
-        lf_last_rn = correction >= 0 ? correction : -correction;  // |correction|
+        lf_last_ln        = base_err >= 0 ? base_err : -base_err;   // |err|
+        lf_last_rn        = correction >= 0 ? correction : -correction;
         lf_last_left_spd  = (unsigned int)left_speed;
         lf_last_right_spd = (unsigned int)right_speed;
         lf_diag_mode = 'P';
