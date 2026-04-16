@@ -5,15 +5,24 @@
 //------------------------------------------------------------------------------
 // Hardware PWM macros -- Timer B3 CCR registers mapped to Port 6 motor pins.
 //
-// Mapping from Project_7 (the "underscore" version that works on this car):
-//   TB3CCR1 --> P6.1  RIGHT FORWARD
-//   TB3CCR2 --> P6.2  LEFT  FORWARD
-//   TB3CCR3 --> P6.3  RIGHT REVERSE
-//   TB3CCR4 --> P6.4  LEFT  REVERSE
+// EMPIRICAL wiring of this specific car (verified via F and B command tests):
+//   CCR1 / P6.1 -- NOT ROUTED to any H-bridge input (dead)
+//   CCR2 / P6.2 -- LEFT  FORWARD
+//   CCR3 / P6.3 -- RIGHT FORWARD   (Project_7 labels this "R_REVERSE" in
+//                                   ports.h, but F/B tests prove it drives
+//                                   the right wheel forward on this car)
+//   CCR4 / P6.4 -- LEFT  REVERSE
+//   CCR5 / P6.5 -- RIGHT REVERSE   (TB3.5; must be enabled as TB3 function
+//                                   in Init_Port6)
+//
+// Project_7 line-follow worked by writing to CCR2 + CCR1 -- only the left
+// wheel actually drove, and the car followed by pivoting around the
+// stationary right wheel.  With the mapping below both wheels drive so
+// F/B/L/R/line-follow all work correctly.
 //------------------------------------------------------------------------------
-#define RIGHT_FORWARD_SPEED (TB3CCR1)  // P6.1
+#define RIGHT_FORWARD_SPEED (TB3CCR3)  // P6.3
 #define LEFT_FORWARD_SPEED  (TB3CCR2)  // P6.2
-#define RIGHT_REVERSE_SPEED (TB3CCR3)  // P6.3
+#define RIGHT_REVERSE_SPEED (TB3CCR5)  // P6.5
 #define LEFT_REVERSE_SPEED  (TB3CCR4)  // P6.4
 
 // Port 1 Pins

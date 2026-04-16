@@ -344,12 +344,11 @@ void Init_Port6(void){
     P6SEL1 &= ~L_REVERSE;
     P6DIR  |=  L_REVERSE;
 
-    // P6.5 -- unused on this car (motor PWM lives on CCR1-4 / P6.1-P6.4 per
-    // the working Project_7 mapping).
-    P6SEL0 &= ~P6_5;
+    // P6.5 -- RIGHT_REVERSE on this car (TB3.5 PWM).  P6.1 is not routed to
+    // any H-bridge input on this PCB, so right-reverse lives on CCR5/P6.5.
+    P6SEL0 |=  P6_5;
     P6SEL1 &= ~P6_5;
-    P6OUT  &= ~P6_5;
-    P6DIR  &= ~P6_5;
+    P6DIR  |=  P6_5;
 
     // P6.6 -- GRN_LED (GPIO output)
     P6SEL0 &= ~GRN_LED;
