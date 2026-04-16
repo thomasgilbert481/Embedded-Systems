@@ -50,27 +50,27 @@ void Init_Timer_B3(void){
     TB3CTL |= MC__UP;                 // Up mode: count 0 -> TB3CCR0
     TB3CTL |= TBCLR;                  // Clear timer counter and dividers
 
-    TB3CCR0 = WHEEL_PERIOD_VAL;       // PWM period (50000 on the reference car)
+    TB3CCR0 = WHEEL_PERIOD_VAL;       // PWM period
 
-    // CCR1 (P6.1) -- unused for motors on this car; kept LOW via OUTMOD_7 + 0.
+    // Empirical motor mapping (see comment in ports.h):
+    //   CCR1 dead, CCR2=left fwd, CCR3=right fwd, CCR4=left rev, CCR5=right rev.
+
+    // CCR1 (P6.1) -- unused on this car.  Kept configured OUTMOD_7 with
+    // value 0 so the pin is held LOW regardless of any stale CCR contents.
     TB3CCTL1 = OUTMOD_7;
     TB3CCR1  = WHEEL_OFF;
 
-    // CCR2 (P6.2) -- RIGHT_FORWARD
-    TB3CCTL2 = OUTMOD_7;
-    RIGHT_FORWARD_SPEED = WHEEL_OFF;
-
-    // CCR3 (P6.3) -- LEFT_FORWARD
-    TB3CCTL3 = OUTMOD_7;
+    TB3CCTL2 = OUTMOD_7;              // CCR2 -> P6.2 LEFT_FORWARD
     LEFT_FORWARD_SPEED  = WHEEL_OFF;
 
-    // CCR4 (P6.4) -- RIGHT_REVERSE
-    TB3CCTL4 = OUTMOD_7;
-    RIGHT_REVERSE_SPEED = WHEEL_OFF;
+    TB3CCTL3 = OUTMOD_7;              // CCR3 -> P6.3 RIGHT_FORWARD
+    RIGHT_FORWARD_SPEED = WHEEL_OFF;
 
-    // CCR5 (P6.5) -- LEFT_REVERSE
-    TB3CCTL5 = OUTMOD_7;
+    TB3CCTL4 = OUTMOD_7;              // CCR4 -> P6.4 LEFT_REVERSE
     LEFT_REVERSE_SPEED  = WHEEL_OFF;
+
+    TB3CCTL5 = OUTMOD_7;              // CCR5 -> P6.5 RIGHT_REVERSE
+    RIGHT_REVERSE_SPEED = WHEEL_OFF;
 }
 
 //==============================================================================

@@ -171,30 +171,63 @@
 #define LINE_FOLLOW_DEFAULT_SECONDS (30)   // Default if ^..N0000 sent with 0 time
 #define CAL_SAMPLE_DELAY_MS         (1000) // Hold each surface ~1 s after SW1
 
-#define FOLLOW_BASE                 (18000) // Base PWM: ~36% duty (slower than
-                                            // P7's 25000 so there's time to correct)
-#define FOLLOW_KP                   (150)   // Proportional gain -- middle ground
-                                            // between P7's 100 (too gentle for
-                                            // two-wheel drive) and 300 (caused
-                                            // motor chatter / stall)
-#define FOLLOW_MAX_PWM              (32000) // Safe PID output ceiling
-
-// Extra speed presets carried over from Project 7 in case you want them later
-#define FOLLOW_FAST                 (35000) // ~70% duty straight-ahead burst
-#define FOLLOW_SPEED                (25000) // ~50% duty normal following
-#define FOLLOW_SLOW                 (20000) // ~40% duty inner-wheel correction
-#define FOLLOW_SEARCH               (25000) // ~50% duty both-off search/recovery
+//------------------------------------------------------------------------------
+// Line-follow PD control (ported verbatim from working Project_7/Follow_Line):
+//   correction = (KP*err + KD*d_err) / PD_SCALE_DIVISOR
+//   left  = BASE - correction
+//   right = BASE + correction
+// When BOTH sensors are OFF the line: drive in REVERSE at REVERSE_SPEED to
+// reacquire (P7's key behaviour -- prevents the car drifting off forever).
+//------------------------------------------------------------------------------
+// Normalized PD: each sensor reading is scaled to [0, 100] using its own
+// calibrated white/black range, so err=0 truly means "both sensors equally
+// on the line" regardless of sensor mismatch (unlike raw ADC subtraction
+// which produces a permanent bias when BL != BR).  After normalization the
+// error range is ~[-100, +100] so KP/KD can be sized accordingly.
+//
+// BASE_FOLLOW_SPEED must be well above the motor's static friction / start
+// threshold (~15-18% duty on these DC motors), otherwise PD corrections
+// that reduce one wheel's speed drop it below threshold and the wheel
+// stalls.  Stalled wheel => car doesn't turn => sensors don't change =>
+// "jittering, waiting for change that isn't coming".
+#define KP_VALUE                    (200)   // err range [-100,+100]
+#define KD_VALUE                    (400)
+#define PD_SCALE_DIVISOR            (10)
+#define BASE_FOLLOW_SPEED           (22000) // ~44% duty -- comfortably above
+                                             // the motor start threshold
+#define MAX_FOLLOW_SPEED            (35000) // ~70% duty ceiling
+#define REVERSE_SPEED               (15000) // Reverse when line lost
+#define SPIN_SPEED                  (20000) // Spin turn speed (Spin_CW/CCW)
+#define FOLLOW_SPEED                (25000) // Straight drive speed (F/B/L/R)
 
 //------------------------------------------------------------------------------
-// Project-7 line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
-// NOTE: P7_INITIAL_TURN_TIME was 5 ticks (1 s) in Project 7 where P6.1 was
-// dead so Spin_CW_On was effectively a single-wheel pivot.  In P9P2 both
-// wheels drive in opposite directions -- true in-place spin, ~4x faster --
-// so 1 s is a full 180°+.  Reduced to 2 ticks (0.4 s) to match the angular
-// rotation P7's pivot produced.  TUNE ON HARDWARE.
+// Line-follow anti-jitter knobs.
+//   LF_OFF_LINE_CONFIRM  -- consecutive Line_Follow_Tick passes (each ~125us)
+//                           with BOTH sensors below threshold required before
+//                           reverse-reacquire fires.  At 100 that's ~12 ms
+//                           of sustained loss -- enough to filter out
+//                           momentary noise dips but fast enough to detect
+//                           a real departure.
+//   LF_LINE_LOST_MARGIN  -- extra counts below threshold required before a
+//                           sensor is considered "clearly" off the line.
+//                           Adds Schmitt-trigger hysteresis around the
+//                           threshold so sensors hovering near the boundary
+//                           don't flap in and out every tick.
+//   LF_ERR_DEADBAND      -- if |normalized error| is smaller than this,
+//                           treat as centered and drive straight.  In
+//                           normalized [0,100] units.
+//------------------------------------------------------------------------------
+#define LF_OFF_LINE_CONFIRM         (100)
+#define LF_LINE_LOST_MARGIN         (150)
+#define LF_ERR_DEADBAND             (5)
+
+//------------------------------------------------------------------------------
+// Line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
+// Project_7 uses 5 ms ticks and 200-tick values (1 s); we use 200 ms ticks and
+// 5-tick values (1 s) for the same behaviour.
 //------------------------------------------------------------------------------
 #define P7_DETECT_STOP_TIME         (5)     // 1 s pause after line detection
-#define P7_INITIAL_TURN_TIME        (2)     // 0.4 s spin -- tune for ~45-90°
+#define P7_INITIAL_TURN_TIME        (5)     // 1 s alignment spin (tune if needed)
 #define LF_SEEK_GUARD_TICKS         (3)     // Ignore sensors for first 0.6 s
                                             // after entering LF_SEEK
 
@@ -206,13 +239,11 @@
 
 //------------------------------------------------------------------------------
 // Timer B3 -- hardware PWM for motors (SMCLK = 8 MHz, no dividers)
-//   WHEEL_PERIOD_VAL = 50005 cycles -> ~6.25 ms period -> ~160 Hz PWM
-//   FOLLOW_SPEED      drive duty   ~ 50%
-//   SPIN_SPEED        spin duty    ~ 50%
+//   WHEEL_PERIOD_VAL = 50000 cycles -> ~6.25 ms period -> ~160 Hz PWM
+//   FOLLOW_SPEED / SPIN_SPEED defined above with the line-follow constants
+//   so they match Project_7 (FOLLOW_SPEED=25000, SPIN_SPEED=20000).
 //------------------------------------------------------------------------------
-#define WHEEL_PERIOD_VAL    (50000)   // Aligned with reference car (was 50005)
-#define FOLLOW_SPEED        (25000)
-#define SPIN_SPEED          (25000)
+#define WHEEL_PERIOD_VAL    (50000)
 
 //------------------------------------------------------------------------------
 // IOT state-machine timeouts (counted in main-loop iterations -- coarse)

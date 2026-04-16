@@ -344,8 +344,8 @@ void Init_Port6(void){
     P6SEL1 &= ~L_REVERSE;
     P6DIR  |=  L_REVERSE;
 
-    // P6.5 -- RIGHT_REVERSE on this car: Timer B3.5 PWM output (SEL0=1, SEL1=0)
-    // (P6.1 / TB3.1 is not routed on this PCB, so TB3.5 / P6.5 fills in.)
+    // P6.5 -- RIGHT_REVERSE on this car (TB3.5 PWM).  P6.1 is not routed to
+    // any H-bridge input on this PCB, so right-reverse lives on CCR5/P6.5.
     P6SEL0 |=  P6_5;
     P6SEL1 &= ~P6_5;
     P6DIR  |=  P6_5;
