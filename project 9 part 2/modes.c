@@ -377,4 +377,8 @@ void Line_Follow_Tick(void){
     RIGHT_REVERSE_SPEED = 0;
     LEFT_FORWARD_SPEED  = (unsigned int)left_speed;
     RIGHT_FORWARD_SPEED = (unsigned int)right_speed;
+
+    // Diagnostic: toggle P2.4 (IOT_RUN_RED) every line-follow iteration so
+    // an oscilloscope or LED on that pin shows the actual reaction rate.
+    P2OUT ^= IOT_RUN_RED;
 }

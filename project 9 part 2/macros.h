@@ -163,14 +163,19 @@
 #define CMD_PAYLOAD_LEN     (10)       // ^ + 4 PIN + 1 dir + 4 time
 
 //------------------------------------------------------------------------------
-// Line following / calibration constants -- values and names copied from
-// Project 7 where this tuning was done on hardware.
+// Line following / calibration constants.
+// Values chosen for a two-wheel-driven car (Project 7's P6.1 was dead, so it
+// effectively ran on one wheel which gave sharper turning; here both wheels
+// drive so we bump KP and lower BASE to compensate).
 //------------------------------------------------------------------------------
 #define LINE_FOLLOW_DEFAULT_SECONDS (30)   // Default if ^..N0000 sent with 0 time
 #define CAL_SAMPLE_DELAY_MS         (1000) // Hold each surface ~1 s after SW1
 
-#define FOLLOW_BASE                 (25000) // Base PWM: ~50% duty (TUNED)
-#define FOLLOW_KP                   (100)   // Proportional gain (TUNED)
+#define FOLLOW_BASE                 (18000) // Base PWM: ~36% duty (slower than
+                                            // P7's 25000 so there's time to correct)
+#define FOLLOW_KP                   (300)   // Proportional gain bumped up 3x from
+                                            // P7 because both wheels are now
+                                            // actively driven
 #define FOLLOW_MAX_PWM              (32000) // Safe PID output ceiling
 
 // Extra speed presets carried over from Project 7 in case you want them later
