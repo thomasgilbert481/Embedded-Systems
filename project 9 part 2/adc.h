@@ -12,6 +12,12 @@ extern volatile unsigned int ADC_Thumb;         // Channel A5 (P1.5)
 
 extern volatile unsigned int ir_emitter_on;     // 1 = IR LED ON
 
+// Set by the ADC ISR whenever a full L/R/Thumb sweep completes.  The PD
+// line-follow loop reads this flag to gate its update so d_error is always
+// computed on a fresh sample pair rather than a re-read of stale values.
+// Consumer clears it after reading.
+extern volatile unsigned char ADC_sample_ready;
+
 void Init_ADC(void);
 
 #endif /* ADC_H_ */

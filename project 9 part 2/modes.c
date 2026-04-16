@@ -286,47 +286,7 @@ static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase bega
 static unsigned char lf_spin_cw    = 0;         // 1 = left sensor saw line first
 static int           lf_last_error = 0;         // PD state: previous error term
 static unsigned int  lf_off_line_cnt = 0;       // Debounce counter for "both off line"
-static unsigned long lf_print_cnt   = 0;        // Throttle for Termite diagnostic
-static char          lf_diag_mode   = ' ';      // 'P'=PD, 'C'=center, 'R'=reverse
-
-//------------------------------------------------------------------------------
-// Helper: print one line of PD diagnostic to Termite.
-//   mode  -- 'P' PD active, 'C' centered/deadband, 'R' reverse-reacquire
-//   ln,rn -- normalized [0,100] sensor readings
-//   ls,rs -- final clamped wheel speeds
-//------------------------------------------------------------------------------
-static void usb_print_int(int v){
-    char buf[8];
-    char out[10];
-    unsigned int i = 0, j;
-    unsigned int u;
-    char neg = 0;
-
-    if(v < 0){ neg = 1; v = -v; }
-    u = (unsigned int)v;
-    if(u == 0){ buf[i++] = '0'; }
-    else { while(u > 0 && i < sizeof(buf)){ buf[i++] = (char)('0' + (u % 10)); u /= 10; } }
-    j = 0;
-    if(neg){ out[j++] = '-'; }
-    while(i > 0){ out[j++] = buf[--i]; }
-    out[j] = SERIAL_NULL;
-    USB_transmit_string(out);
-}
-
-static void lf_print_diag(char mode, int ln, int rn, int ls, int rs){
-    char m[2] = {mode, 0};
-    USB_transmit_string("LF[");
-    USB_transmit_string(m);
-    USB_transmit_string("] Ln=");
-    usb_print_int(ln);
-    USB_transmit_string(" Rn=");
-    usb_print_int(rn);
-    USB_transmit_string(" Ls=");
-    usb_print_int(ls);
-    USB_transmit_string(" Rs=");
-    usb_print_int(rs);
-    USB_transmit_string("\r\n");
-}
+static char          lf_diag_mode   = ' ';      // 'P'=PD, 'R'=reverse-reacquire
 
 void Line_Follow_Start(unsigned int seconds){
     if(!calibration_done){
@@ -374,23 +334,16 @@ void Line_Follow_Start(unsigned int seconds){
 
 //------------------------------------------------------------------------------
 // Periodic LCD update during line-follow.  Every ~0.25 s redraw with the
-// diagnostic most useful for the current problem:
-//   Line 0: "Ln:ddddd   "  normalized left  sensor (0..100)
-//   Line 1: "Rn:ddddd   "  normalized right sensor (0..100)
+// quantities that make the PD loop legible at a glance:
+//   Line 0: "Er:ddddd   "  |raw ADC error| = |ADC_L - ADC_R|
+//   Line 1: "Cr:ddddd   "  |post-shift/clamp correction|
 //   Line 2: "Ls:ddddd   "  commanded left  PWM speed
 //   Line 3: "Rs:ddddd   "  commanded right PWM speed
-//
-// Read this as:
-//   Ln==Rn==100 -> both sensors fully on line; controller sees no error
-//                  (this is why Ls and Rs came back identical -- the line
-//                  covers both sensors simultaneously).
-//   Ln and Rn differing as the car drifts -> PD can produce a correction.
-//   Ls != Rs -> PD IS outputting differential; watch the wheels.
 //------------------------------------------------------------------------------
 static unsigned int lf_last_left_spd  = 0;
 static unsigned int lf_last_right_spd = 0;
-static int          lf_last_ln        = 0;
-static int          lf_last_rn        = 0;
+static int          lf_last_ln        = 0;     // |err|
+static int          lf_last_rn        = 0;     // |correction|
 
 static void line_follow_display(int unused_l, int unused_r){
     (void)unused_l;
@@ -399,8 +352,8 @@ static void line_follow_display(int unused_l, int unused_r){
         return;
     }
     line_dbg_cnt = 0;
-    lcd_write_value(0, "Ln", (unsigned int)(lf_last_ln < 0 ? 0 : lf_last_ln));
-    lcd_write_value(1, "Rn", (unsigned int)(lf_last_rn < 0 ? 0 : lf_last_rn));
+    lcd_write_value(0, "Er", (unsigned int)(lf_last_ln < 0 ? 0 : lf_last_ln));
+    lcd_write_value(1, "Cr", (unsigned int)(lf_last_rn < 0 ? 0 : lf_last_rn));
     lcd_write_value(2, "Ls", lf_last_left_spd);
     lcd_write_value(3, "Rs", lf_last_right_spd);
     display_changed = TRUE;
@@ -514,30 +467,18 @@ void Line_Follow_Tick(void){
     {
         // Hysteresis: the sensor is considered CLEARLY off the line only if
         // its reading is below threshold by more than LF_LINE_LOST_MARGIN.
-        // This prevents flapping when the raw reading hovers around the
-        // threshold boundary.
         unsigned int left_on_line  = (ADC_Left_Detect  + LF_LINE_LOST_MARGIN
                                        > threshold_left);
         unsigned int right_on_line = (ADC_Right_Detect + LF_LINE_LOST_MARGIN
                                        > threshold_right);
-        unsigned int left_range;
-        unsigned int right_range;
-        int left_norm;
-        int right_norm;
         int base_err;
         int delta_err;
-        int abs_err;
 
-        // Show raw ADC values on LCD at the display rate
+        // Refresh the LCD display (rate-limited internally).
         line_follow_display(0, 0);
 
         //----------------------------------------------------------------------
-        // Reverse-reacquire (wide-line mode only).  Disabled when
-        // LF_REVERSE_REACQUIRE=0 because on a narrow line (the line passes
-        // between the sensors) "both sensors below threshold" is the
-        // CENTERED state and must not trigger reverse.  In that mode we
-        // let PD handle everything and trust the driver/user to intervene
-        // if the car genuinely drives off.
+        // Reverse-reacquire (wide-line mode only).  Gated on LF_REVERSE_REACQUIRE.
         //----------------------------------------------------------------------
 #if LF_REVERSE_REACQUIRE
         if(!left_on_line && !right_on_line){
@@ -547,10 +488,10 @@ void Line_Follow_Tick(void){
                 LEFT_REVERSE_SPEED  = REVERSE_SPEED;
                 RIGHT_FORWARD_SPEED = WHEEL_OFF;
                 RIGHT_REVERSE_SPEED = REVERSE_SPEED;
-                lf_diag_mode = 'R';   // Reverse re-acquire
+                lf_diag_mode = 'R';
                 break;
             }
-            // Inside debounce window -- keep previous motor state
+            // Debounce window -- leave motors alone.
             break;
         }
         lf_off_line_cnt = 0;
@@ -560,60 +501,35 @@ void Line_Follow_Tick(void){
 #endif
 
         //----------------------------------------------------------------------
-        // Normalize each sensor using its own white/black calibration.
-        // Lower bound is clamped to 0 (at or below white) but the UPPER
-        // bound is NOT clamped -- if a sensor reads deeper-than-calibrated
-        // black we let the value go above 100 so we can still distinguish
-        // "slightly on the line" from "fully on the line".  That's the only
-        // way err becomes nonzero when both sensors are sitting on a wide
-        // black line; without it both saturate at 100 and the controller
-        // permanently thinks it's centered.
+        // PD on RAW ADC difference.  Only update on a fresh ADC sample so
+        // d_error is derived from genuinely new data.  Running PD faster
+        // than the ADC produces stale d_error that looks like noise.
         //----------------------------------------------------------------------
-        left_range  = (black_left  > white_left)  ? (black_left  - white_left)  : 1;
-        right_range = (black_right > white_right) ? (black_right - white_right) : 1;
-
-        if(ADC_Left_Detect <= white_left){
-            left_norm = 0;
-        } else {
-            left_norm = (int)(((unsigned long)(ADC_Left_Detect - white_left) * 100UL)
-                              / (unsigned long)left_range);
+        if(!ADC_sample_ready){
+            // No new sample yet -- leave motor state unchanged.
+            break;
         }
-        if(ADC_Right_Detect <= white_right){
-            right_norm = 0;
-        } else {
-            right_norm = (int)(((unsigned long)(ADC_Right_Detect - white_right) * 100UL)
-                               / (unsigned long)right_range);
-        }
+        ADC_sample_ready = 0;
 
-        base_err = left_norm - right_norm;            // range ~[-100, +100]
-        abs_err  = (base_err < 0) ? -base_err : base_err;
+        base_err      = (int)ADC_Left_Detect - (int)ADC_Right_Detect;
+        delta_err     = base_err - lf_last_error;
+        lf_last_error = base_err;
 
-        // Snapshot for LCD
-        lf_last_ln = left_norm;
-        lf_last_rn = right_norm;
+        correction = (KP_VALUE * base_err) + (KD_VALUE * delta_err);
+        correction = correction >> PD_SHIFT;          // /16 via right shift
 
-        if(abs_err < LF_ERR_DEADBAND){
-            // Essentially centered on the line -- straight ahead.
-            lf_last_error = 0;
-            left_speed  = (int)BASE_FOLLOW_SPEED;
-            right_speed = (int)BASE_FOLLOW_SPEED;
-            lf_diag_mode = 'C';   // Centered (deadband)
-        } else {
-            delta_err  = base_err - lf_last_error;
-            lf_last_error = base_err;
+        // Clamp the correction itself so one wheel never drops into stall
+        // territory and the other never saturates above CCR0.
+        if(correction >  (int)MAX_CORRECTION) correction =  (int)MAX_CORRECTION;
+        if(correction < -(int)MAX_CORRECTION) correction = -(int)MAX_CORRECTION;
 
-            correction = (KP_VALUE * base_err) + (KD_VALUE * delta_err);
-            correction = correction / PD_SCALE_DIVISOR;
+        left_speed  = (int)BASE_FOLLOW_SPEED - correction;
+        right_speed = (int)BASE_FOLLOW_SPEED + correction;
 
-            left_speed  = (int)BASE_FOLLOW_SPEED - correction;
-            right_speed = (int)BASE_FOLLOW_SPEED + correction;
-            lf_diag_mode = 'P';   // PD active
-        }
-
-        if(left_speed  < 0)                         left_speed  = 0;
-        if(right_speed < 0)                         right_speed = 0;
-        if(left_speed  > (int)MAX_FOLLOW_SPEED)     left_speed  = (int)MAX_FOLLOW_SPEED;
-        if(right_speed > (int)MAX_FOLLOW_SPEED)     right_speed = (int)MAX_FOLLOW_SPEED;
+        // Defensive non-negative clamp (shouldn't trigger if MAX_CORRECTION
+        // is sized correctly relative to BASE_FOLLOW_SPEED).
+        if(left_speed  < 0) left_speed  = 0;
+        if(right_speed < 0) right_speed = 0;
 
         // H-bridge mutex per wheel.
         LEFT_REVERSE_SPEED  = WHEEL_OFF;
@@ -621,18 +537,12 @@ void Line_Follow_Tick(void){
         RIGHT_REVERSE_SPEED = WHEEL_OFF;
         RIGHT_FORWARD_SPEED = (unsigned int)right_speed;
 
-        // Snapshot the commanded speeds so the LCD update can show them.
+        // Snapshot for LCD display
+        lf_last_ln = base_err >= 0 ? base_err : -base_err;   // show |err|
+        lf_last_rn = correction >= 0 ? correction : -correction;  // |correction|
         lf_last_left_spd  = (unsigned int)left_speed;
         lf_last_right_spd = (unsigned int)right_speed;
-
-        // Periodic Termite diagnostic so we can see what the controller
-        // is actually doing.  Fires roughly twice per second.
-        lf_print_cnt++;
-        if(lf_print_cnt >= LINE_DBG_INTERVAL){
-            lf_print_cnt = 0;
-            lf_print_diag(lf_diag_mode, left_norm, right_norm,
-                          left_speed, right_speed);
-        }
+        lf_diag_mode = 'P';
     } break;
 
     default:

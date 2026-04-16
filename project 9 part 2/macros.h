@@ -179,23 +179,29 @@
 // When BOTH sensors are OFF the line: drive in REVERSE at REVERSE_SPEED to
 // reacquire (P7's key behaviour -- prevents the car drifting off forever).
 //------------------------------------------------------------------------------
-// Normalized PD: each sensor reading is scaled to [0, 100] using its own
-// calibrated white/black range, so err=0 truly means "both sensors equally
-// on the line" regardless of sensor mismatch (unlike raw ADC subtraction
-// which produces a permanent bias when BL != BR).  After normalization the
-// error range is ~[-100, +100] so KP/KD can be sized accordingly.
+// PD on RAW ADC difference (matches Project_7's working algorithm):
+//   error = ADC_Left - ADC_Right
+//   correction = (KP*error + KD*(error - last_error)) >> PD_SHIFT
+//   clamp correction to +/-MAX_CORRECTION
+//   left  = BASE - correction
+//   right = BASE + correction
 //
-// BASE_FOLLOW_SPEED must be well above the motor's static friction / start
-// threshold (~15-18% duty on these DC motors), otherwise PD corrections
-// that reduce one wheel's speed drop it below threshold and the wheel
-// stalls.  Stalled wheel => car doesn't turn => sensors don't change =>
-// "jittering, waiting for change that isn't coming".
-#define KP_VALUE                    (200)   // err range [-100,+100]
-#define KD_VALUE                    (400)
-#define PD_SCALE_DIVISOR            (10)
-#define BASE_FOLLOW_SPEED           (22000) // ~44% duty -- comfortably above
-                                             // the motor start threshold
-#define MAX_FOLLOW_SPEED            (35000) // ~70% duty ceiling
+// Raw ADC range is 12-bit (0..4095) so error spans +/-4095.  The shift
+// scales that into a reasonable PWM correction band.  MAX_CORRECTION
+// bounds the differential so one wheel never drops below the motor's
+// stall threshold and the other doesn't saturate.
+//
+// Tune in this order:
+//   1) Set KD=0, BASE_SPEED moderate, raise KP until the car visibly
+//      steers but oscillates.
+//   2) Raise KD (typically 2-4x KP) until oscillation damps.
+//   3) Push BASE_SPEED up if the car's too slow, retune if it over-runs
+//      curves.
+#define KP_VALUE                    (20)
+#define KD_VALUE                    (40)
+#define PD_SHIFT                    (4)     // correction >>= PD_SHIFT (= /16)
+#define BASE_FOLLOW_SPEED           (40000) // Nominal forward PWM
+#define MAX_CORRECTION              (8000)  // clamp on the per-wheel correction
 #define REVERSE_SPEED               (15000) // Reverse when line lost
 #define SPIN_SPEED                  (20000) // Spin turn speed (Spin_CW/CCW)
 #define FOLLOW_SPEED                (25000) // Straight drive speed (F/B/L/R)
