@@ -497,8 +497,14 @@ void Line_Follow_Tick(void){
     //--------------------------------------------------------------------------
     case LF_FOLLOW:
     {
-        unsigned int left_on_line  = (ADC_Left_Detect  > threshold_left);
-        unsigned int right_on_line = (ADC_Right_Detect > threshold_right);
+        // Hysteresis: the sensor is considered CLEARLY off the line only if
+        // its reading is below threshold by more than LF_LINE_LOST_MARGIN.
+        // This prevents flapping when the raw reading hovers around the
+        // threshold boundary.
+        unsigned int left_on_line  = (ADC_Left_Detect  + LF_LINE_LOST_MARGIN
+                                       > threshold_left);
+        unsigned int right_on_line = (ADC_Right_Detect + LF_LINE_LOST_MARGIN
+                                       > threshold_right);
         unsigned int left_range;
         unsigned int right_range;
         int left_norm;

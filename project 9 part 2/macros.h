@@ -184,28 +184,42 @@
 // on the line" regardless of sensor mismatch (unlike raw ADC subtraction
 // which produces a permanent bias when BL != BR).  After normalization the
 // error range is ~[-100, +100] so KP/KD can be sized accordingly.
-#define KP_VALUE                    (300)
-#define KD_VALUE                    (600)
+//
+// BASE_FOLLOW_SPEED must be well above the motor's static friction / start
+// threshold (~15-18% duty on these DC motors), otherwise PD corrections
+// that reduce one wheel's speed drop it below threshold and the wheel
+// stalls.  Stalled wheel => car doesn't turn => sensors don't change =>
+// "jittering, waiting for change that isn't coming".
+#define KP_VALUE                    (200)   // err range [-100,+100]
+#define KD_VALUE                    (400)
 #define PD_SCALE_DIVISOR            (10)
-#define BASE_FOLLOW_SPEED           (12000) // Nominal PD following speed (slower
-                                             // so corrections have more relative bite)
-#define MAX_FOLLOW_SPEED            (25000) // Max after PD correction
+#define BASE_FOLLOW_SPEED           (22000) // ~44% duty -- comfortably above
+                                             // the motor start threshold
+#define MAX_FOLLOW_SPEED            (35000) // ~70% duty ceiling
 #define REVERSE_SPEED               (15000) // Reverse when line lost
 #define SPIN_SPEED                  (20000) // Spin turn speed (Spin_CW/CCW)
 #define FOLLOW_SPEED                (25000) // Straight drive speed (F/B/L/R)
 
 //------------------------------------------------------------------------------
 // Line-follow anti-jitter knobs.
-//   LF_OFF_LINE_CONFIRM  -- consecutive Line_Follow_Tick passes with BOTH
-//                           sensors below threshold required before reverse-
-//                           reacquire fires.  Larger = less reverse stutter,
-//                           but slower to detect a real loss of the line.
-//   LF_ERR_DEADBAND      -- if |normalized error| (now in [0,100]) is smaller
-//                           than this, treat as centered and drive straight.
-//                           Set to 0 to disable.
+//   LF_OFF_LINE_CONFIRM  -- consecutive Line_Follow_Tick passes (each ~125us)
+//                           with BOTH sensors below threshold required before
+//                           reverse-reacquire fires.  At 100 that's ~12 ms
+//                           of sustained loss -- enough to filter out
+//                           momentary noise dips but fast enough to detect
+//                           a real departure.
+//   LF_LINE_LOST_MARGIN  -- extra counts below threshold required before a
+//                           sensor is considered "clearly" off the line.
+//                           Adds Schmitt-trigger hysteresis around the
+//                           threshold so sensors hovering near the boundary
+//                           don't flap in and out every tick.
+//   LF_ERR_DEADBAND      -- if |normalized error| is smaller than this,
+//                           treat as centered and drive straight.  In
+//                           normalized [0,100] units.
 //------------------------------------------------------------------------------
-#define LF_OFF_LINE_CONFIRM         (10)
-#define LF_ERR_DEADBAND             (3)
+#define LF_OFF_LINE_CONFIRM         (100)
+#define LF_LINE_LOST_MARGIN         (150)
+#define LF_ERR_DEADBAND             (5)
 
 //------------------------------------------------------------------------------
 // Line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
