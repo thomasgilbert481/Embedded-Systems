@@ -202,21 +202,22 @@
 
 //------------------------------------------------------------------------------
 // Line-follow anti-jitter knobs.
-//   LF_OFF_LINE_CONFIRM  -- consecutive Line_Follow_Tick passes (each ~125us)
-//                           with BOTH sensors below threshold required before
-//                           reverse-reacquire fires.  At 100 that's ~12 ms
-//                           of sustained loss -- enough to filter out
-//                           momentary noise dips but fast enough to detect
-//                           a real departure.
-//   LF_LINE_LOST_MARGIN  -- extra counts below threshold required before a
-//                           sensor is considered "clearly" off the line.
-//                           Adds Schmitt-trigger hysteresis around the
-//                           threshold so sensors hovering near the boundary
-//                           don't flap in and out every tick.
-//   LF_ERR_DEADBAND      -- if |normalized error| is smaller than this,
-//                           treat as centered and drive straight.  In
-//                           normalized [0,100] units.
+//   LF_REVERSE_REACQUIRE -- 1 = enable the "both sensors off line -> reverse to
+//                               find it again" behaviour.  Makes sense for a
+//                               WIDE line where both sensors normally sit over
+//                               black, so "both off" genuinely means lost.
+//                           0 = disable entirely.  Required for a NARROW line
+//                               where the line passes between the sensors --
+//                               "both off line" is the expected CENTERED state
+//                               and should not trigger reverse.
+//   LF_OFF_LINE_CONFIRM  -- how many consecutive passes of both-off-line before
+//                           reverse fires (only used if LF_REVERSE_REACQUIRE=1).
+//   LF_LINE_LOST_MARGIN  -- Schmitt hysteresis around the threshold in raw ADC
+//                           counts (only used if LF_REVERSE_REACQUIRE=1).
+//   LF_ERR_DEADBAND      -- if |normalized error| < this, drive straight.
+//                           In normalized units (0..100+). 0 = always run PD.
 //------------------------------------------------------------------------------
+#define LF_REVERSE_REACQUIRE        (0)     // narrow-line mode -- reverse OFF
 #define LF_OFF_LINE_CONFIRM         (100)
 #define LF_LINE_LOST_MARGIN         (150)
 #define LF_ERR_DEADBAND             (0)     // 0 = always run PD, never force

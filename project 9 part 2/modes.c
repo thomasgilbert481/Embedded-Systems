@@ -532,10 +532,14 @@ void Line_Follow_Tick(void){
         line_follow_display(0, 0);
 
         //----------------------------------------------------------------------
-        // Hysteresis: only trigger reverse-reacquire if BOTH sensors have been
-        // below threshold for LF_OFF_LINE_CONFIRM consecutive passes.  Single
-        // noise dips are absorbed.
+        // Reverse-reacquire (wide-line mode only).  Disabled when
+        // LF_REVERSE_REACQUIRE=0 because on a narrow line (the line passes
+        // between the sensors) "both sensors below threshold" is the
+        // CENTERED state and must not trigger reverse.  In that mode we
+        // let PD handle everything and trust the driver/user to intervene
+        // if the car genuinely drives off.
         //----------------------------------------------------------------------
+#if LF_REVERSE_REACQUIRE
         if(!left_on_line && !right_on_line){
             lf_off_line_cnt++;
             if(lf_off_line_cnt >= LF_OFF_LINE_CONFIRM){
@@ -550,6 +554,10 @@ void Line_Follow_Tick(void){
             break;
         }
         lf_off_line_cnt = 0;
+#else
+        (void)left_on_line;
+        (void)right_on_line;
+#endif
 
         //----------------------------------------------------------------------
         // Normalize each sensor using its own white/black calibration.
