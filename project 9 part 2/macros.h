@@ -206,13 +206,11 @@
 
 //------------------------------------------------------------------------------
 // Timer B3 -- hardware PWM for motors (SMCLK = 8 MHz, no dividers)
-//   WHEEL_PERIOD_VAL = 50005 cycles -> ~6.25 ms period -> ~160 Hz PWM
-//   FOLLOW_SPEED      drive duty   ~ 50%
-//   SPIN_SPEED        spin duty    ~ 50%
+//   WHEEL_PERIOD_VAL = 50000 cycles -> ~6.25 ms period -> ~160 Hz PWM
+//   FOLLOW_SPEED / SPIN_SPEED defined above with the line-follow constants
+//   so they match Project_7 (FOLLOW_SPEED=25000, SPIN_SPEED=20000).
 //------------------------------------------------------------------------------
-#define WHEEL_PERIOD_VAL    (50000)   // Aligned with reference car (was 50005)
-#define FOLLOW_SPEED        (25000)
-#define SPIN_SPEED          (25000)
+#define WHEEL_PERIOD_VAL    (50000)
 
 //------------------------------------------------------------------------------
 // IOT state-machine timeouts (counted in main-loop iterations -- coarse)
