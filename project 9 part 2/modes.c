@@ -372,10 +372,19 @@ void Line_Follow_Tick(void){
     if(left_speed  > (int)FOLLOW_MAX_PWM) left_speed  = (int)FOLLOW_MAX_PWM;
     if(right_speed > (int)FOLLOW_MAX_PWM) right_speed = (int)FOLLOW_MAX_PWM;
 
-    // Drive forward only -- clear reverse channels first (safety)
-    LEFT_REVERSE_SPEED  = 0;
-    RIGHT_REVERSE_SPEED = 0;
+    // ── H-bridge mutex ──────────────────────────────────────────────────────
+    // For EACH wheel, write WHEEL_OFF to the reverse channel BEFORE writing
+    // any non-zero forward PWM.  Doing it per-wheel (not batched) guarantees
+    // that even if an ISR fires between writes, we cannot leave both fwd+rev
+    // non-zero on the same wheel at the same time.
+    //
+    // Also: we never write the forward value unless we've just zeroed the
+    // reverse in the same sequential pair of stores.
+    // ────────────────────────────────────────────────────────────────────────
+    LEFT_REVERSE_SPEED  = WHEEL_OFF;
     LEFT_FORWARD_SPEED  = (unsigned int)left_speed;
+
+    RIGHT_REVERSE_SPEED = WHEEL_OFF;
     RIGHT_FORWARD_SPEED = (unsigned int)right_speed;
 
     // Diagnostic: toggle P2.4 (IOT_RUN_RED) every line-follow iteration so

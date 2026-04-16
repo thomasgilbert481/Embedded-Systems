@@ -173,9 +173,10 @@
 
 #define FOLLOW_BASE                 (18000) // Base PWM: ~36% duty (slower than
                                             // P7's 25000 so there's time to correct)
-#define FOLLOW_KP                   (300)   // Proportional gain bumped up 3x from
-                                            // P7 because both wheels are now
-                                            // actively driven
+#define FOLLOW_KP                   (150)   // Proportional gain -- middle ground
+                                            // between P7's 100 (too gentle for
+                                            // two-wheel drive) and 300 (caused
+                                            // motor chatter / stall)
 #define FOLLOW_MAX_PWM              (32000) // Safe PID output ceiling
 
 // Extra speed presets carried over from Project 7 in case you want them later
