@@ -219,7 +219,9 @@
 //------------------------------------------------------------------------------
 #define LF_OFF_LINE_CONFIRM         (100)
 #define LF_LINE_LOST_MARGIN         (150)
-#define LF_ERR_DEADBAND             (5)
+#define LF_ERR_DEADBAND             (0)     // 0 = always run PD, never force
+                                             // straight-drive. Raise to 3-5 once
+                                             // steering is confirmed working.
 
 //------------------------------------------------------------------------------
 // Line-follow pre-sequence timings (in 200 ms Timer B0 ticks).

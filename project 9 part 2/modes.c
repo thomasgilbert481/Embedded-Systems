@@ -552,25 +552,26 @@ void Line_Follow_Tick(void){
         lf_off_line_cnt = 0;
 
         //----------------------------------------------------------------------
-        // Normalize each sensor to [0, 100] using its own white/black
-        // calibration.  This removes per-sensor bias so err=0 is truly
-        // "centered on the line" regardless of mismatched calibrations.
+        // Normalize each sensor using its own white/black calibration.
+        // Lower bound is clamped to 0 (at or below white) but the UPPER
+        // bound is NOT clamped -- if a sensor reads deeper-than-calibrated
+        // black we let the value go above 100 so we can still distinguish
+        // "slightly on the line" from "fully on the line".  That's the only
+        // way err becomes nonzero when both sensors are sitting on a wide
+        // black line; without it both saturate at 100 and the controller
+        // permanently thinks it's centered.
         //----------------------------------------------------------------------
         left_range  = (black_left  > white_left)  ? (black_left  - white_left)  : 1;
         right_range = (black_right > white_right) ? (black_right - white_right) : 1;
 
         if(ADC_Left_Detect <= white_left){
             left_norm = 0;
-        } else if(ADC_Left_Detect >= black_left){
-            left_norm = 100;
         } else {
             left_norm = (int)(((unsigned long)(ADC_Left_Detect - white_left) * 100UL)
                               / (unsigned long)left_range);
         }
         if(ADC_Right_Detect <= white_right){
             right_norm = 0;
-        } else if(ADC_Right_Detect >= black_right){
-            right_norm = 100;
         } else {
             right_norm = (int)(((unsigned long)(ADC_Right_Detect - white_right) * 100UL)
                                / (unsigned long)right_range);
