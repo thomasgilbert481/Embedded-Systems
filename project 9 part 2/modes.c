@@ -73,9 +73,10 @@ static void lcd_write_value(unsigned int line_idx, const char *label, unsigned i
 
     if(line_idx > 3) return;
 
-    // Clamp to 5 digits (so PWM speeds up to 65535 / BASE=22000 etc. show
-    // their real value instead of saturating at 9999).
-    if(value > 99999u) value = 99999u;
+    // unsigned int is 16-bit on MSP430 (max 65535), so values > 99999 can't
+    // even be expressed.  Clamp to 5-digit printable range (<=65535) which
+    // comfortably covers every motor PWM we use (CCR0 = 50000).
+    // Overflow-past-65535 is impossible by type.
 
     tenk      = value / 10000u;      value -= tenk      * 10000u;
     thousands = value / 1000u;       value -= thousands * 1000u;
