@@ -217,7 +217,7 @@
 //   LF_ERR_DEADBAND      -- if |normalized error| < this, drive straight.
 //                           In normalized units (0..100+). 0 = always run PD.
 //------------------------------------------------------------------------------
-#define LF_REVERSE_REACQUIRE        (0)     // narrow-line mode -- reverse OFF
+#define LF_REVERSE_REACQUIRE        (1)     // wide-line mode -- reverse ON
 #define LF_OFF_LINE_CONFIRM         (100)
 #define LF_LINE_LOST_MARGIN         (150)
 #define LF_ERR_DEADBAND             (0)     // 0 = always run PD, never force
