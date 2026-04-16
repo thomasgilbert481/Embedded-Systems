@@ -179,47 +179,59 @@
 // When BOTH sensors are OFF the line: drive in REVERSE at REVERSE_SPEED to
 // reacquire (P7's key behaviour -- prevents the car drifting off forever).
 //------------------------------------------------------------------------------
-// Normalized PD: each sensor reading is scaled to [0, 100] using its own
-// calibrated white/black range, so err=0 truly means "both sensors equally
-// on the line" regardless of sensor mismatch (unlike raw ADC subtraction
-// which produces a permanent bias when BL != BR).  After normalization the
-// error range is ~[-100, +100] so KP/KD can be sized accordingly.
+// Line-follow runs with Project_7's ORIGINAL pin and algorithm config.  The
+// line-follow state switches the Port 6 pin layout on entry and restores it
+// on exit so that F/B/R/L commands (which use the current P9P2 mapping)
+// are unaffected.  Direct TB3CCRn writes are used during line-follow so
+// the speed macros in ports.h don't interfere.
 //
-// BASE_FOLLOW_SPEED must be well above the motor's static friction / start
-// threshold (~15-18% duty on these DC motors), otherwise PD corrections
-// that reduce one wheel's speed drop it below threshold and the wheel
-// stalls.  Stalled wheel => car doesn't turn => sensors don't change =>
-// "jittering, waiting for change that isn't coming".
-#define KP_VALUE                    (200)   // err range [-100,+100]
-#define KD_VALUE                    (400)
-#define PD_SCALE_DIVISOR            (10)
-#define BASE_FOLLOW_SPEED           (22000) // ~44% duty -- comfortably above
-                                             // the motor start threshold
-#define MAX_FOLLOW_SPEED            (35000) // ~70% duty ceiling
-#define REVERSE_SPEED               (15000) // Reverse when line lost
-#define SPIN_SPEED                  (20000) // Spin turn speed (Spin_CW/CCW)
-#define FOLLOW_SPEED                (25000) // Straight drive speed (F/B/L/R)
+// Project_7 motor wiring (this car):
+//   CCR1 -> P6.1 RIGHT_FORWARD  (dead on this car; writes are harmless)
+//   CCR2 -> P6.2 LEFT_FORWARD
+//   CCR3 -> P6.3 RIGHT_REVERSE
+//   CCR4 -> P6.4 LEFT_REVERSE
+//   P6.5 is GPIO input during line-follow, TB3.5 output otherwise
+//
+// Project_7 PD tuning (verbatim from the working reference):
+#define P7_KP                       (1)
+#define P7_KD                       (5)
+#define P7_PD_DIVISOR               (10)
+#define P7_BASE_SPEED               (20000) // Nominal forward PWM during follow
+#define P7_MAX_SPEED                (35000) // Per-wheel clamp
+#define P7_REVERSE_SPEED            (15000) // Reverse-reacquire PWM
+#define P7_SPIN_SPEED               (20000) // Spin turn PWM (align phase)
+
+// Speeds used by wheels.c for Forward_On/Reverse_On/Spin_CW/CCW (F/B/R/L
+// commands).  These run on the P9P2 pin mapping (CCR2-CCR5) -- completely
+// independent of the Project_7 line-follow values above.
+#define FOLLOW_SPEED                (25000)
+#define SPIN_SPEED                  (20000)
+#define REVERSE_SPEED               (15000) // currently unused by wheels.c but
+                                             // left defined for any future caller
 
 //------------------------------------------------------------------------------
 // Line-follow anti-jitter knobs.
-//   LF_OFF_LINE_CONFIRM  -- consecutive Line_Follow_Tick passes (each ~125us)
-//                           with BOTH sensors below threshold required before
-//                           reverse-reacquire fires.  At 100 that's ~12 ms
-//                           of sustained loss -- enough to filter out
-//                           momentary noise dips but fast enough to detect
-//                           a real departure.
-//   LF_LINE_LOST_MARGIN  -- extra counts below threshold required before a
-//                           sensor is considered "clearly" off the line.
-//                           Adds Schmitt-trigger hysteresis around the
-//                           threshold so sensors hovering near the boundary
-//                           don't flap in and out every tick.
-//   LF_ERR_DEADBAND      -- if |normalized error| is smaller than this,
-//                           treat as centered and drive straight.  In
-//                           normalized [0,100] units.
+//   LF_REVERSE_REACQUIRE -- 1 = enable the "both sensors off line -> reverse to
+//                               find it again" behaviour.  Makes sense for a
+//                               WIDE line where both sensors normally sit over
+//                               black, so "both off" genuinely means lost.
+//                           0 = disable entirely.  Required for a NARROW line
+//                               where the line passes between the sensors --
+//                               "both off line" is the expected CENTERED state
+//                               and should not trigger reverse.
+//   LF_OFF_LINE_CONFIRM  -- how many consecutive passes of both-off-line before
+//                           reverse fires (only used if LF_REVERSE_REACQUIRE=1).
+//   LF_LINE_LOST_MARGIN  -- Schmitt hysteresis around the threshold in raw ADC
+//                           counts (only used if LF_REVERSE_REACQUIRE=1).
+//   LF_ERR_DEADBAND      -- if |normalized error| < this, drive straight.
+//                           In normalized units (0..100+). 0 = always run PD.
 //------------------------------------------------------------------------------
+#define LF_REVERSE_REACQUIRE        (1)     // wide-line mode -- reverse ON
 #define LF_OFF_LINE_CONFIRM         (100)
 #define LF_LINE_LOST_MARGIN         (150)
-#define LF_ERR_DEADBAND             (5)
+#define LF_ERR_DEADBAND             (0)     // 0 = always run PD, never force
+                                             // straight-drive. Raise to 3-5 once
+                                             // steering is confirmed working.
 
 //------------------------------------------------------------------------------
 // Line-follow pre-sequence timings (in 200 ms Timer B0 ticks).

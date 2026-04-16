@@ -19,6 +19,9 @@ static volatile unsigned int adc_channel = 0;  // Which channel we just read
 
 volatile unsigned int ir_emitter_on = 0;
 
+// Set when the ADC ISR finishes a full A2->A3->A5 sweep.
+volatile unsigned char ADC_sample_ready = 0;
+
 #define ADC_SEQ_LEFT   (0)
 #define ADC_SEQ_RIGHT  (1)
 #define ADC_SEQ_THUMB  (2)
@@ -67,6 +70,7 @@ __interrupt void ADC_ISR(void){
                     ADCMCTL0 &= ~ADCINCH_15;
                     ADCMCTL0 |=  ADCINCH_2;
                     adc_channel = 0;
+                    ADC_sample_ready = 1;   // Full L/R/Thumb sweep complete
                     break;
                 default:
                     adc_channel = 0;
