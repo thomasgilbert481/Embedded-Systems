@@ -264,7 +264,24 @@ void Calibration_Tick(void){
 //==============================================================================
 // Line_Follow_Start -- ^1234N<time> arrived.
 // seconds == 0 -> use LINE_FOLLOW_DEFAULT_SECONDS
+//
+// Kicks off the Project-7 style pre-sequence:
+//   LF_SEEK   -> drive forward until an IR sensor crosses its threshold
+//   LF_PAUSE  -> 1 s stop after line detection
+//   LF_ALIGN  -> 1 s spin toward the line so both sensors straddle it
+//   LF_FOLLOW -> proportional control (the "working" P7 algorithm)
 //==============================================================================
+
+// Sub-states for the line-follow sequence
+#define LF_SEEK     (0)
+#define LF_PAUSE    (1)
+#define LF_ALIGN    (2)
+#define LF_FOLLOW   (3)
+
+static unsigned char lf_sub_state  = LF_SEEK;
+static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase began
+static unsigned char lf_spin_cw    = 0;         // 1 = left sensor saw line first
+
 void Line_Follow_Start(unsigned int seconds){
     if(!calibration_done){
         USB_transmit_string("ERR: not calibrated\r\n");
@@ -287,7 +304,12 @@ void Line_Follow_Start(unsigned int seconds){
     mode_line_active = 1;
     line_dbg_cnt     = LINE_DBG_INTERVAL;   // force first LCD update right away
 
-    USB_transmit_string("LINE start\r\n");
+    // Begin with the SEEK phase (drive forward hunting for the line).
+    lf_sub_state  = LF_SEEK;
+    lf_phase_tick = Time_Sequence;
+    Forward_On();                            // Start driving forward
+
+    USB_transmit_string("LINE seek\r\n");
 }
 
 //------------------------------------------------------------------------------
@@ -314,80 +336,144 @@ static void line_follow_display(int left_norm, int right_norm){
 
 //==============================================================================
 // Line_Follow_Tick -- called from main loop every iteration while active.
-// Proportional steering.  ADC_Left_Detect/Right_Detect updated by ADC ISR.
-// cmd_remaining_ms countdown (and motor stop) is handled by Vehicle_Cmd_Tick.
+// Full Project-7 line-following sequence:
+//   1. LF_SEEK   -- drive forward until a sensor crosses threshold
+//   2. LF_PAUSE  -- 1 s stop after detection
+//   3. LF_ALIGN  -- 1 s spin toward line (direction based on which sensor saw it)
+//   4. LF_FOLLOW -- proportional control (byte-identical to P7_FOLLOW_LINE)
+//
+// Full-time countdown (cmd_remaining_ms) covers the entire sequence.
+// Vehicle_Cmd_Tick handles the final motor stop when the timer expires.
 //==============================================================================
 void Line_Follow_Tick(void){
     unsigned int left_range;
     unsigned int right_range;
-    int left_norm;
-    int right_norm;
-    int error;
-    int correction;
-    int left_speed;
-    int right_speed;
+    int  left_norm;
+    int  right_norm;
+    int  error;
+    int  correction;
+    int  left_speed;
+    int  right_speed;
+    unsigned int phase_elapsed;
 
     if(!mode_line_active){
         return;
     }
     if(cmd_remaining_ms == 0){
-        // Countdown expired -- Vehicle_Cmd_Tick already stopped motors.
+        // Overall countdown expired -- Vehicle_Cmd_Tick already stopped motors.
         mode_line_active = 0;
-        Display_Network_Info();   // Restore IP layout on the LCD
+        Display_Network_Info();
         return;
     }
 
-    left_range  = (black_left  > white_left)  ? (black_left  - white_left)  : 1;
-    right_range = (black_right > white_right) ? (black_right - white_right) : 1;
+    phase_elapsed = (unsigned int)(Time_Sequence - lf_phase_tick);
 
-    // Normalize each sensor to [0, 100]: 0 = white, 100 = black
-    if(ADC_Left_Detect <= white_left){
-        left_norm = 0;
-    } else if(ADC_Left_Detect >= black_left){
-        left_norm = 100;
-    } else {
-        left_norm = (int)(((unsigned long)(ADC_Left_Detect - white_left) * 100UL)
-                          / (unsigned long)left_range);
+    switch(lf_sub_state){
+
+    //--------------------------------------------------------------------------
+    // LF_SEEK -- P7_FORWARD equivalent.  Drive forward until either sensor
+    // crosses its calibrated threshold.  Ignore sensors for the first
+    // LF_SEEK_GUARD_TICKS to let the car start moving past any residual
+    // reading.
+    //--------------------------------------------------------------------------
+    case LF_SEEK:
+        if(phase_elapsed >= LF_SEEK_GUARD_TICKS &&
+           ((ADC_Left_Detect  > threshold_left) ||
+            (ADC_Right_Detect > threshold_right))){
+            // Line found -- snapshot which side saw it stronger.
+            lf_spin_cw = (ADC_Left_Detect > ADC_Right_Detect) ? 1 : 0;
+            Wheels_All_Off();
+            USB_transmit_string("LINE detected\r\n");
+            lf_sub_state  = LF_PAUSE;
+            lf_phase_tick = Time_Sequence;
+        }
+        // (Forward_On() was already called in Line_Follow_Start; motors keep running)
+        break;
+
+    //--------------------------------------------------------------------------
+    // LF_PAUSE -- P7_DETECTED_STOP equivalent.  Motors off, wait ~1 s.
+    //--------------------------------------------------------------------------
+    case LF_PAUSE:
+        if(phase_elapsed >= P7_DETECT_STOP_TIME){
+            // Spin toward the side that saw the line (to center both sensors).
+            if(lf_spin_cw){
+                Spin_CW_On();
+            } else {
+                Spin_CCW_On();
+            }
+            USB_transmit_string("LINE align\r\n");
+            lf_sub_state  = LF_ALIGN;
+            lf_phase_tick = Time_Sequence;
+        }
+        break;
+
+    //--------------------------------------------------------------------------
+    // LF_ALIGN -- P7_TURNING equivalent.  Spin for ~1 s to line both sensors
+    // up over the line, then start proportional follow.
+    //--------------------------------------------------------------------------
+    case LF_ALIGN:
+        if(phase_elapsed >= P7_INITIAL_TURN_TIME){
+            Wheels_All_Off();
+            USB_transmit_string("LINE follow\r\n");
+            lf_sub_state  = LF_FOLLOW;
+            lf_phase_tick = Time_Sequence;
+        }
+        break;
+
+    //--------------------------------------------------------------------------
+    // LF_FOLLOW -- P7_FOLLOW_LINE, byte-for-byte.  Normalize -> proportional
+    // correction -> clamp -> write PWM with H-bridge mutex.
+    //--------------------------------------------------------------------------
+    case LF_FOLLOW:
+        left_range  = (black_left  > white_left)  ? (black_left  - white_left)  : 1;
+        right_range = (black_right > white_right) ? (black_right - white_right) : 1;
+
+        if(ADC_Left_Detect <= white_left){
+            left_norm = 0;
+        } else if(ADC_Left_Detect >= black_left){
+            left_norm = 100;
+        } else {
+            left_norm = (int)(((unsigned long)(ADC_Left_Detect - white_left) * 100UL)
+                              / (unsigned long)left_range);
+        }
+
+        if(ADC_Right_Detect <= white_right){
+            right_norm = 0;
+        } else if(ADC_Right_Detect >= black_right){
+            right_norm = 100;
+        } else {
+            right_norm = (int)(((unsigned long)(ADC_Right_Detect - white_right) * 100UL)
+                               / (unsigned long)right_range);
+        }
+
+        error      = right_norm - left_norm;
+        correction = FOLLOW_KP * error;
+
+        line_follow_display(left_norm, right_norm);
+
+        left_speed  = (int)FOLLOW_BASE + correction;
+        right_speed = (int)FOLLOW_BASE - correction;
+
+        if(left_speed  < 0)                    left_speed  = 0;
+        if(right_speed < 0)                    right_speed = 0;
+        if(left_speed  > (int)FOLLOW_MAX_PWM)  left_speed  = (int)FOLLOW_MAX_PWM;
+        if(right_speed > (int)FOLLOW_MAX_PWM)  right_speed = (int)FOLLOW_MAX_PWM;
+
+        // H-bridge mutex -- per wheel, clear reverse before writing forward.
+        LEFT_REVERSE_SPEED  = WHEEL_OFF;
+        LEFT_FORWARD_SPEED  = (unsigned int)left_speed;
+
+        RIGHT_REVERSE_SPEED = WHEEL_OFF;
+        RIGHT_FORWARD_SPEED = (unsigned int)right_speed;
+        break;
+
+    default:
+        // Shouldn't happen; bail safely.
+        mode_line_active = 0;
+        Wheels_All_Off();
+        break;
     }
 
-    if(ADC_Right_Detect <= white_right){
-        right_norm = 0;
-    } else if(ADC_Right_Detect >= black_right){
-        right_norm = 100;
-    } else {
-        right_norm = (int)(((unsigned long)(ADC_Right_Detect - white_right) * 100UL)
-                           / (unsigned long)right_range);
-    }
-
-    error      = right_norm - left_norm;
-    correction = FOLLOW_KP * error;
-
-    line_follow_display(left_norm, right_norm);
-
-    left_speed  = (int)FOLLOW_BASE + correction;
-    right_speed = (int)FOLLOW_BASE - correction;
-
-    if(left_speed  < 0)                       left_speed  = 0;
-    if(right_speed < 0)                       right_speed = 0;
-    if(left_speed  > (int)FOLLOW_MAX_PWM) left_speed  = (int)FOLLOW_MAX_PWM;
-    if(right_speed > (int)FOLLOW_MAX_PWM) right_speed = (int)FOLLOW_MAX_PWM;
-
-    // ── H-bridge mutex ──────────────────────────────────────────────────────
-    // For EACH wheel, write WHEEL_OFF to the reverse channel BEFORE writing
-    // any non-zero forward PWM.  Doing it per-wheel (not batched) guarantees
-    // that even if an ISR fires between writes, we cannot leave both fwd+rev
-    // non-zero on the same wheel at the same time.
-    //
-    // Also: we never write the forward value unless we've just zeroed the
-    // reverse in the same sequential pair of stores.
-    // ────────────────────────────────────────────────────────────────────────
-    LEFT_REVERSE_SPEED  = WHEEL_OFF;
-    LEFT_FORWARD_SPEED  = (unsigned int)left_speed;
-
-    RIGHT_REVERSE_SPEED = WHEEL_OFF;
-    RIGHT_FORWARD_SPEED = (unsigned int)right_speed;
-
-    // Diagnostic: toggle P2.4 (IOT_RUN_RED) every line-follow iteration so
-    // an oscilloscope or LED on that pin shows the actual reaction rate.
+    // Rate diagnostic (toggles every tick while line-follow is active).
     P2OUT ^= IOT_RUN_RED;
 }

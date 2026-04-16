@@ -186,6 +186,15 @@
 #define FOLLOW_SEARCH               (25000) // ~50% duty both-off search/recovery
 
 //------------------------------------------------------------------------------
+// Project-7 line-follow pre-sequence timings (in 200 ms Timer B0 ticks).
+// Copied directly from Project 7/macros.h so the behaviour is identical.
+//------------------------------------------------------------------------------
+#define P7_DETECT_STOP_TIME         (5)     // 1 s pause after line detection
+#define P7_INITIAL_TURN_TIME        (5)     // 1 s spin to align on the line
+#define LF_SEEK_GUARD_TICKS         (3)     // Ignore sensors for first 0.6 s
+                                            // after entering LF_SEEK
+
+//------------------------------------------------------------------------------
 // Motor command countdown -- decrement step in CCR0 ISR (every 200 ms)
 // Each Timer B0 CCR0 tick = 200 ms = TB0_TICK_MS
 //------------------------------------------------------------------------------
