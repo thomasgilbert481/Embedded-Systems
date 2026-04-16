@@ -371,12 +371,18 @@ void Line_Follow_Start(unsigned int seconds){
 
 //------------------------------------------------------------------------------
 // Periodic LCD update during line-follow.  Every ~0.25 s redraw the four
-// lines with current ADC readings and their calibrated thresholds:
+// lines with raw ADC readings and the commanded wheel speeds:
 //   Line 0: "L :dddd   "  raw left  ADC
 //   Line 1: "R :dddd   "  raw right ADC
-//   Line 2: "TL:dddd   "  left  threshold (line detected if L > TL)
-//   Line 3: "TR:dddd   "  right threshold (line detected if R > TR)
+//   Line 2: "Ls:dddd   "  commanded left  PWM speed (what PD wrote)
+//   Line 3: "Rs:dddd   "  commanded right PWM speed
+// If Ls and Rs stay identical while the car is supposedly steering, the
+// controller is not producing differential output.  If they clearly differ
+// but the car still doesn't turn, the motors aren't responding.
 //------------------------------------------------------------------------------
+static unsigned int lf_last_left_spd  = 0;
+static unsigned int lf_last_right_spd = 0;
+
 static void line_follow_display(int unused_l, int unused_r){
     (void)unused_l;
     (void)unused_r;
@@ -386,8 +392,8 @@ static void line_follow_display(int unused_l, int unused_r){
     line_dbg_cnt = 0;
     lcd_write_value(0, "L ", ADC_Left_Detect);
     lcd_write_value(1, "R ", ADC_Right_Detect);
-    lcd_write_value(2, "TL", threshold_left);
-    lcd_write_value(3, "TR", threshold_right);
+    lcd_write_value(2, "Ls", lf_last_left_spd);
+    lcd_write_value(3, "Rs", lf_last_right_spd);
     display_changed = TRUE;
 }
 
@@ -592,6 +598,10 @@ void Line_Follow_Tick(void){
         LEFT_FORWARD_SPEED  = (unsigned int)left_speed;
         RIGHT_REVERSE_SPEED = WHEEL_OFF;
         RIGHT_FORWARD_SPEED = (unsigned int)right_speed;
+
+        // Snapshot the commanded speeds so the LCD update can show them.
+        lf_last_left_spd  = (unsigned int)left_speed;
+        lf_last_right_spd = (unsigned int)right_speed;
 
         // Periodic Termite diagnostic so we can see what the controller
         // is actually doing.  Fires roughly twice per second.
