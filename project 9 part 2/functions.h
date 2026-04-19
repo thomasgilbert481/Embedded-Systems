@@ -130,5 +130,6 @@ void Init_ADC(void);
 void Quit_Everything(void);
 void Calibration_Start(void);
 void Calibration_Tick(void);
-void Line_Follow_Start(unsigned int seconds);
+void Line_Follow_Start(unsigned int seconds, unsigned char seek_mode);
+void Line_Follow_Begin_Exit(void);
 void Line_Follow_Tick(void);

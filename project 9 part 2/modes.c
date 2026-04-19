@@ -72,8 +72,6 @@ static void lf_exit_p7_pins(void);
 static void lf_motors_forward(unsigned int left, unsigned int right);
 static void lf_motors_reverse(unsigned int speed);
 static void lf_motors_stop(void);
-static void lf_motors_spin_cw(unsigned int speed);
-static void lf_motors_spin_ccw(unsigned int speed);
 
 //------------------------------------------------------------------------------
 // Helper: write "AA:dddd  " into display_line[line_idx] where AA is a 2-char
@@ -485,22 +483,6 @@ static void lf_motors_reverse(unsigned int speed){
 
 static void lf_motors_stop(void){
     TB3CCR1 = 0; TB3CCR2 = 0; TB3CCR3 = 0; TB3CCR4 = 0;
-}
-
-static void lf_motors_spin_cw(unsigned int speed){
-    // Project_7 Spin_CW = LEFT_FWD + RIGHT_REV = CCR2 + CCR3
-    TB3CCR1 = 0;
-    TB3CCR4 = 0;
-    TB3CCR2 = speed;
-    TB3CCR3 = speed;
-}
-
-static void lf_motors_spin_ccw(unsigned int speed){
-    // Project_7 Spin_CCW = RIGHT_FWD + LEFT_REV = CCR1 + CCR4
-    TB3CCR2 = 0;
-    TB3CCR3 = 0;
-    TB3CCR1 = speed;
-    TB3CCR4 = speed;
 }
 
 //==============================================================================
