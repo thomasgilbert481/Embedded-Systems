@@ -471,14 +471,20 @@ void Parse_IPD_Command(char *line){
                 continue;
             }
             if(dir == CMD_DIR_QUIT_FWD){
-                Quit_Everything();
-                cmd_q_head = cmd_q_tail;
-                // Now start forward motion for the requested time.
-                Forward_On();
-                cmd_active_dir   = CMD_DIR_QUIT_FWD;
-                cmd_active_time  = time_units;
-                cmd_remaining_ms = time_units * CMD_TIME_UNIT_MS;
-                USB_transmit_string("CMD: G fwd\r\n");
+                cmd_q_head = cmd_q_tail;   // flush pending queue
+                if(mode_line_active){
+                    // During line-follow: run the exit sequence
+                    // (stop → left 90° → forward → stop → DONE).
+                    Line_Follow_Begin_Exit();
+                } else {
+                    // Not in line-follow: plain quit + forward.
+                    Quit_Everything();
+                    Forward_On();
+                    cmd_active_dir   = CMD_DIR_QUIT_FWD;
+                    cmd_active_time  = time_units;
+                    cmd_remaining_ms = time_units * CMD_TIME_UNIT_MS;
+                    USB_transmit_string("CMD: G fwd\r\n");
+                }
                 p += CMD_PAYLOAD_LEN;
                 queued_count = 1;
                 continue;

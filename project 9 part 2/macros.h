@@ -246,6 +246,9 @@
 #define P7_INITIAL_TURN_TIME        (5)     // 1 s alignment spin (tune if needed)
 #define LF_SEEK_GUARD_TICKS         (3)     // Ignore sensors for first 0.6 s
                                             // after entering LF_SEEK
+#define LF_EXIT_STOP_TIME           (3)     // 0.6 s pause before exit turn
+#define LF_EXIT_TURN_TIME           (5)     // 1 s left spin (tune for ~90°)
+#define LF_EXIT_FWD_TIME            (10)    // 2 s forward drive into circle center
 
 //------------------------------------------------------------------------------
 // Motor command countdown -- decrement step in CCR0 ISR (every 200 ms)

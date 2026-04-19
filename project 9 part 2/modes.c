@@ -287,10 +287,14 @@ void Calibration_Tick(void){
 //==============================================================================
 
 // Sub-states for the line-follow sequence
-#define LF_SEEK     (0)
-#define LF_PAUSE    (1)
-#define LF_ALIGN    (2)
-#define LF_FOLLOW   (3)
+#define LF_SEEK       (0)
+#define LF_PAUSE      (1)
+#define LF_ALIGN      (2)
+#define LF_FOLLOW     (3)
+#define LF_EXIT_STOP  (4)
+#define LF_EXIT_TURN  (5)
+#define LF_EXIT_FWD   (6)
+#define LF_EXIT_DONE  (7)
 
 static unsigned char lf_sub_state  = LF_SEEK;
 static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase began
@@ -352,6 +356,22 @@ void Line_Follow_Start(unsigned int seconds){
     Forward_On();
 
     USB_transmit_string("LINE seek\r\n");
+}
+
+//==============================================================================
+// Line_Follow_Begin_Exit -- called by ^G while line-follow is active.
+// Switches from P7 pins back to P9P2 so the exit sequence (spin + forward)
+// can use both wheels, then enters the LF_EXIT_STOP sub-state.  The exit
+// sequence runs entirely inside Line_Follow_Tick.
+//==============================================================================
+void Line_Follow_Begin_Exit(void){
+    lf_motors_stop();            // halt P7-layout motors
+    lf_exit_p7_pins();           // restore P9P2 pin layout
+    Wheels_All_Off();            // defensive: zero P9P2 CCRs too
+    cmd_remaining_ms = 65000u;   // extend countdown so exit sequence has time
+    lf_sub_state  = LF_EXIT_STOP;
+    lf_phase_tick = Time_Sequence;
+    USB_transmit_string("LINE exit\r\n");
 }
 
 //------------------------------------------------------------------------------
@@ -607,8 +627,54 @@ void Line_Follow_Tick(void){
         lf_last_right_spd = (unsigned int)right_speed;
     } break;
 
+    //--------------------------------------------------------------------------
+    // EXIT SEQUENCE (triggered by ^G during line-follow):
+    //   stop → spin left ~90° → drive forward → stop → display DONE
+    // These states run on the P9P2 pin layout (lf_exit_p7_pins already
+    // called by Line_Follow_Begin_Exit) so both wheels drive.
+    //--------------------------------------------------------------------------
+    case LF_EXIT_STOP:
+        Wheels_All_Off();
+        if(phase_elapsed >= LF_EXIT_STOP_TIME){
+            Spin_CCW_On();   // Left turn (CCW) on P9P2 pins
+            lf_phase_tick = Time_Sequence;
+            lf_sub_state  = LF_EXIT_TURN;
+        }
+        break;
+
+    case LF_EXIT_TURN:
+        if(phase_elapsed >= LF_EXIT_TURN_TIME){
+            Wheels_All_Off();
+            Forward_On();    // Drive forward on P9P2 pins
+            lf_phase_tick = Time_Sequence;
+            lf_sub_state  = LF_EXIT_FWD;
+        }
+        break;
+
+    case LF_EXIT_FWD:
+        if(phase_elapsed >= LF_EXIT_FWD_TIME){
+            Wheels_All_Off();
+            lf_phase_tick = Time_Sequence;
+            lf_sub_state  = LF_EXIT_DONE;
+
+            strcpy(display_line[0], "   DONE   ");
+            strcpy(display_line[1], "          ");
+            strcpy(display_line[2], "          ");
+            strcpy(display_line[3], "          ");
+            display_changed = TRUE;
+        }
+        break;
+
+    case LF_EXIT_DONE:
+        // Stay here briefly then clean up.
+        if(phase_elapsed >= 5){     // ~1 s of "DONE" on screen
+            mode_line_active = 0;
+            cmd_remaining_ms = 0;
+            cmd_active_dir   = SERIAL_NULL;
+        }
+        break;
+
     default:
-        // Shouldn't happen; bail safely.
         mode_line_active = 0;
         Wheels_All_Off();
         break;
