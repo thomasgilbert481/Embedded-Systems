@@ -158,8 +158,10 @@
 #define CMD_DIR_LEFT        ('L')
 #define CMD_DIR_QUIT        ('Q')   // ^1234Q0000 -- abort current cmd + queue
 #define CMD_DIR_CALIBRATE   ('C')   // ^1234C0000 -- run white/black calibration
-#define CMD_DIR_LINE_FOLLOW ('N')   // ^1234N<time> -- liNe follow for time
+#define CMD_DIR_LINE_FOLLOW ('N')   // ^1234N<time> -- liNe follow (straight seek)
                                     //   time=0000 -> follow indefinitely until ^Q
+#define CMD_DIR_LINE_RIGHT  ('H')   // ^1234H<time> -- seek line via right arc, then follow
+#define CMD_DIR_LINE_LEFT   ('J')   // ^1234J<time> -- seek line via left arc, then follow
 #define CMD_DIR_QUIT_FWD    ('G')   // ^1234G<time> -- quit + drive forward for time
 #define CMD_DIR_ARRIVED     ('A')   // ^1234A0000 -- cycle "Arrived 0X" on LCD line 1
                                     //   X wraps 01..08..01 on each press
@@ -246,6 +248,18 @@
 #define P7_INITIAL_TURN_TIME        (5)     // 1 s alignment spin (tune if needed)
 #define LF_SEEK_GUARD_TICKS         (3)     // Ignore sensors for first 0.6 s
                                             // after entering LF_SEEK
+//------------------------------------------------------------------------------
+// Arc-seek: differential wheel speeds to make the car drive in a rainbow
+// (semicircle) path toward the line instead of going straight.
+// Outer wheel runs at ARC_OUTER, inner wheel at ARC_INNER.  The tighter
+// the ratio inner/outer, the tighter the arc.  TUNE THESE ON HARDWARE.
+//
+// For ^H (right arc): left wheel = outer (fast), right wheel = inner (slow).
+// For ^J (left arc):  right wheel = outer (fast), left wheel = inner (slow).
+//------------------------------------------------------------------------------
+#define ARC_OUTER_SPEED             (30000) // Outer wheel PWM during arc seek
+#define ARC_INNER_SPEED             (15000) // Inner wheel PWM during arc seek
+
 #define LF_EXIT_STOP_TIME           (3)     // 0.6 s pause before exit turn
 #define LF_EXIT_TURN_TIME           (5)     // 1 s left spin (tune for ~90°)
 #define LF_EXIT_FWD_TIME            (10)    // 2 s forward drive into circle center

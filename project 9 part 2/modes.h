@@ -29,7 +29,8 @@ extern volatile unsigned char mode_line_active;
 //------------------------------------------------------------------------------
 void Quit_Everything(void);      // Q: abort cmd/queue/cal/line
 void Calibration_Start(void);    // C: kick off calibration state machine
-void Line_Follow_Start(unsigned int seconds);  // N: begin line follow
+// seek_mode: 0=straight (^N), 1=right arc (^H), 2=left arc (^J)
+void Line_Follow_Start(unsigned int seconds, unsigned char seek_mode);
 void Line_Follow_Begin_Exit(void);             // G during follow: exit sequence
 
 //------------------------------------------------------------------------------

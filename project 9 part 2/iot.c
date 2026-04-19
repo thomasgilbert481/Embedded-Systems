@@ -372,8 +372,13 @@ static void start_cmd(char dir, unsigned int time_units){
             Calibration_Start();
             return;
         case CMD_DIR_LINE_FOLLOW:
-            // time_units is in 100 ms units; Line_Follow_Start wants seconds.
-            Line_Follow_Start(time_units / 10);
+            Line_Follow_Start(time_units / 10, 0);   // straight seek
+            return;
+        case CMD_DIR_LINE_RIGHT:
+            Line_Follow_Start(time_units / 10, 1);   // right arc seek
+            return;
+        case CMD_DIR_LINE_LEFT:
+            Line_Follow_Start(time_units / 10, 2);   // left arc seek
             return;
         case CMD_DIR_QUIT:
             Quit_Everything();

@@ -300,10 +300,12 @@ static unsigned char lf_sub_state  = LF_SEEK;
 static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase began
 static unsigned char lf_spin_cw    = 0;         // 1 = left sensor saw line first
 static int           lf_last_error = 0;         // PD state: previous error term
+// Seek mode: 0 = straight (^N), 1 = right arc (^H), 2 = left arc (^J)
+static unsigned char lf_seek_mode  = 0;
 // (lf_off_line_cnt and lf_diag_mode were used by the old
 // normalized-PD implementation; Project_7's port doesn't need them.)
 
-void Line_Follow_Start(unsigned int seconds){
+void Line_Follow_Start(unsigned int seconds, unsigned char seek_mode){
     if(!calibration_done){
         USB_transmit_string("ERR: not calibrated\r\n");
         return;
@@ -349,13 +351,32 @@ void Line_Follow_Start(unsigned int seconds){
     mode_line_active = 1;
     line_dbg_cnt     = LINE_DBG_INTERVAL;
     lf_last_error    = 0;
+    lf_seek_mode     = seek_mode;       // 0=straight, 1=right arc, 2=left arc
 
-    // Begin SEEK using P9P2 mapping -- Forward_On drives both wheels.
+    // Begin SEEK using P9P2 mapping.
     lf_sub_state  = LF_SEEK;
     lf_phase_tick = Time_Sequence;
-    Forward_On();
 
-    USB_transmit_string("LINE seek\r\n");
+    switch(lf_seek_mode){
+        case 1:  // Right arc: left=outer(fast), right=inner(slow)
+            LEFT_REVERSE_SPEED  = WHEEL_OFF;
+            LEFT_FORWARD_SPEED  = ARC_OUTER_SPEED;
+            RIGHT_REVERSE_SPEED = WHEEL_OFF;
+            RIGHT_FORWARD_SPEED = ARC_INNER_SPEED;
+            USB_transmit_string("LINE seek R\r\n");
+            break;
+        case 2:  // Left arc: right=outer(fast), left=inner(slow)
+            LEFT_REVERSE_SPEED  = WHEEL_OFF;
+            LEFT_FORWARD_SPEED  = ARC_INNER_SPEED;
+            RIGHT_REVERSE_SPEED = WHEEL_OFF;
+            RIGHT_FORWARD_SPEED = ARC_OUTER_SPEED;
+            USB_transmit_string("LINE seek L\r\n");
+            break;
+        default: // Straight
+            Forward_On();
+            USB_transmit_string("LINE seek\r\n");
+            break;
+    }
 }
 
 //==============================================================================
@@ -525,10 +546,22 @@ void Line_Follow_Tick(void){
         if(phase_elapsed >= LF_SEEK_GUARD_TICKS &&
            ((ADC_Left_Detect  > threshold_left) ||
             (ADC_Right_Detect > threshold_right))){
-            // Line found -- snapshot which side saw it stronger.
-            lf_spin_cw = (ADC_Left_Detect > ADC_Right_Detect) ? 1 : 0;
             Wheels_All_Off();
             USB_transmit_string("LINE detected\r\n");
+
+            // Decide which way to spin during ALIGN to face along the line.
+            // For arc seeks the alignment direction is known a priori:
+            //   Right arc (^H) -> car approached from the right -> spin LEFT (CCW)
+            //   Left  arc (^J) -> car approached from the left  -> spin RIGHT (CW)
+            // For straight (^N) -> use whichever sensor saw it first (original logic).
+            if(lf_seek_mode == 1){
+                lf_spin_cw = 0;   // align LEFT after right-arc
+            } else if(lf_seek_mode == 2){
+                lf_spin_cw = 1;   // align RIGHT after left-arc
+            } else {
+                lf_spin_cw = (ADC_Left_Detect > ADC_Right_Detect) ? 1 : 0;
+            }
+
             lf_sub_state  = LF_PAUSE;
             lf_phase_tick = Time_Sequence;
         }
