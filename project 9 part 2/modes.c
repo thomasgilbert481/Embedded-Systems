@@ -322,10 +322,10 @@ void Line_Follow_Start(unsigned int seconds){
     Wheels_All_Off();
     mode_cal_active = 0;
 
-    // Switch Port 6 / CCR layout to Project_7's configuration.  Wheels_All_Off
-    // above cleared the P9P2 CCRs; lf_enter_p7_pins zeros them all again and
-    // reconfigures P6.5 as GPIO input.
-    lf_enter_p7_pins();
+    // NOTE: we do NOT switch to Project_7 pin layout here -- the SEEK/PAUSE/
+    // ALIGN phases use the P9P2 mapping (via wheels.c helpers) so that both
+    // wheels actually drive forward during SEEK.  The switch to P7 pins
+    // happens later, just before entering LF_FOLLOW.
 
     P2OUT |= IR_LED;
     ir_emitter_on = 1;
@@ -335,16 +335,16 @@ void Line_Follow_Start(unsigned int seconds){
     }
 
     cmd_active_dir   = CMD_DIR_LINE_FOLLOW;
-    cmd_active_time  = seconds * 10;        // record in time-units
-    cmd_remaining_ms = seconds * 1000u;     // ms
+    cmd_active_time  = seconds * 10;
+    cmd_remaining_ms = seconds * 1000u;
     mode_line_active = 1;
-    line_dbg_cnt     = LINE_DBG_INTERVAL;   // force first LCD update right away
+    line_dbg_cnt     = LINE_DBG_INTERVAL;
     lf_last_error    = 0;
 
-    // Begin with the SEEK phase (drive forward hunting for the line).
+    // Begin SEEK using P9P2 mapping -- Forward_On drives both wheels.
     lf_sub_state  = LF_SEEK;
     lf_phase_tick = Time_Sequence;
-    lf_motors_forward(P7_BASE_SPEED, P7_BASE_SPEED);
+    Forward_On();
 
     USB_transmit_string("LINE seek\r\n");
 }
@@ -512,14 +512,15 @@ void Line_Follow_Tick(void){
 
     //--------------------------------------------------------------------------
     // LF_PAUSE -- P7_DETECTED_STOP equivalent.  Motors off, wait ~1 s.
+    // Still on P9P2 pin layout -- both wheels respond.
     //--------------------------------------------------------------------------
     case LF_PAUSE:
         if(phase_elapsed >= P7_DETECT_STOP_TIME){
-            // Spin toward the side that saw the line (to center both sensors).
+            // Spin toward the side that saw the line (P9P2 Spin functions).
             if(lf_spin_cw){
-                lf_motors_spin_cw(P7_SPIN_SPEED);
+                Spin_CW_On();
             } else {
-                lf_motors_spin_ccw(P7_SPIN_SPEED);
+                Spin_CCW_On();
             }
             USB_transmit_string("LINE align\r\n");
             lf_sub_state  = LF_ALIGN;
@@ -528,19 +529,22 @@ void Line_Follow_Tick(void){
         break;
 
     //--------------------------------------------------------------------------
-    // LF_ALIGN -- P7_TURNING equivalent.  Spin until both sensors cross
-    // threshold (early exit) or until P7_INITIAL_TURN_TIME elapses.
+    // LF_ALIGN -- P7_TURNING equivalent.  Still on P9P2 pin layout.  Spin
+    // until both sensors cross threshold (early exit) or timer elapses.
+    // On exit: switch to Project_7 pin layout for LF_FOLLOW.
     //--------------------------------------------------------------------------
     case LF_ALIGN:
         if((ADC_Left_Detect  > threshold_left) &&
            (ADC_Right_Detect > threshold_right)){
-            lf_motors_stop();
+            Wheels_All_Off();
+            lf_enter_p7_pins();              // Switch to P7 pin layout NOW
             USB_transmit_string("LINE follow\r\n");
             lf_last_error = 0;
             lf_sub_state  = LF_FOLLOW;
             lf_phase_tick = Time_Sequence;
         } else if(phase_elapsed >= P7_INITIAL_TURN_TIME){
-            lf_motors_stop();
+            Wheels_All_Off();
+            lf_enter_p7_pins();              // Switch to P7 pin layout NOW
             USB_transmit_string("LINE follow\r\n");
             lf_last_error = 0;
             lf_sub_state  = LF_FOLLOW;
