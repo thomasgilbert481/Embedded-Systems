@@ -159,6 +159,8 @@
 #define CMD_DIR_QUIT        ('Q')   // ^1234Q0000 -- abort current cmd + queue
 #define CMD_DIR_CALIBRATE   ('C')   // ^1234C0000 -- run white/black calibration
 #define CMD_DIR_LINE_FOLLOW ('N')   // ^1234N<time> -- liNe follow for time
+                                    //   time=0000 -> follow indefinitely until ^Q
+#define CMD_DIR_QUIT_FWD    ('G')   // ^1234G<time> -- quit + drive forward for time
 #define CMD_TIME_UNIT_MS    (100)      // each time-unit digit = 100 ms
 #define CMD_PAYLOAD_LEN     (10)       // ^ + 4 PIN + 1 dir + 4 time
 

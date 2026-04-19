@@ -376,9 +376,14 @@ static void start_cmd(char dir, unsigned int time_units){
             Line_Follow_Start(time_units / 10);
             return;
         case CMD_DIR_QUIT:
-            // Queued quit -- also valid, same as the immediate path.
             Quit_Everything();
             return;
+        case CMD_DIR_QUIT_FWD:
+            // Quit whatever is running (line-follow, etc.) then drive forward.
+            Quit_Everything();
+            Forward_On();
+            USB_transmit_string("CMD: G fwd\r\n");
+            break;   // fall through to set cmd_remaining_ms below
         default:
             USB_transmit_string("ERR: bad dir\r\n");
             return;
@@ -456,13 +461,26 @@ void Parse_IPD_Command(char *line){
                 return;  // parse error already printed
             }
 
-            // Q is a control command -- execute IMMEDIATELY, do not queue.
+            // Q and G are control commands -- execute IMMEDIATELY, do not queue.
             // Clears any queue we've already built up in this same payload too.
             if(dir == CMD_DIR_QUIT){
                 Quit_Everything();
-                cmd_q_head = cmd_q_tail;   // flush any pending
+                cmd_q_head = cmd_q_tail;
                 p += CMD_PAYLOAD_LEN;
-                queued_count = 1;          // suppress "ERR: no cmd"
+                queued_count = 1;
+                continue;
+            }
+            if(dir == CMD_DIR_QUIT_FWD){
+                Quit_Everything();
+                cmd_q_head = cmd_q_tail;
+                // Now start forward motion for the requested time.
+                Forward_On();
+                cmd_active_dir   = CMD_DIR_QUIT_FWD;
+                cmd_active_time  = time_units;
+                cmd_remaining_ms = time_units * CMD_TIME_UNIT_MS;
+                USB_transmit_string("CMD: G fwd\r\n");
+                p += CMD_PAYLOAD_LEN;
+                queued_count = 1;
                 continue;
             }
 

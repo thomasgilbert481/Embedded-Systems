@@ -330,13 +330,18 @@ void Line_Follow_Start(unsigned int seconds){
     P2OUT |= IR_LED;
     ir_emitter_on = 1;
 
+    // seconds=0 means "follow indefinitely until ^Q or ^G".
+    // Use max unsigned int (~65 seconds at 200ms tick) as the countdown;
+    // Vehicle_Cmd_Tick will decrement but the user sends ^Q long before
+    // it expires.  If they don't, the car just stops after ~65 s.
     if(seconds == 0){
-        seconds = LINE_FOLLOW_DEFAULT_SECONDS;
+        cmd_remaining_ms = 65000u;  // ~65 s fallback
+    } else {
+        cmd_remaining_ms = seconds * 1000u;
     }
 
     cmd_active_dir   = CMD_DIR_LINE_FOLLOW;
-    cmd_active_time  = seconds * 10;
-    cmd_remaining_ms = seconds * 1000u;
+    cmd_active_time  = (seconds == 0) ? 650u : seconds * 10;
     mode_line_active = 1;
     line_dbg_cnt     = LINE_DBG_INTERVAL;
     lf_last_error    = 0;
