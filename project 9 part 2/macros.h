@@ -161,6 +161,8 @@
 #define CMD_DIR_LINE_FOLLOW ('N')   // ^1234N<time> -- liNe follow for time
                                     //   time=0000 -> follow indefinitely until ^Q
 #define CMD_DIR_QUIT_FWD    ('G')   // ^1234G<time> -- quit + drive forward for time
+#define CMD_DIR_ARRIVED     ('A')   // ^1234A0000 -- cycle "Arrived 0X" on LCD line 1
+                                    //   X wraps 01..08..01 on each press
 #define CMD_TIME_UNIT_MS    (100)      // each time-unit digit = 100 ms
 #define CMD_PAYLOAD_LEN     (10)       // ^ + 4 PIN + 1 dir + 4 time
 

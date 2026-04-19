@@ -483,6 +483,18 @@ void Parse_IPD_Command(char *line){
                 queued_count = 1;
                 continue;
             }
+            if(dir == CMD_DIR_ARRIVED){
+                // Cycle "Arrived 0X" display on LCD line 1, X wraps 01..08.
+                static unsigned char arrived_pad = 0;
+                arrived_pad = (arrived_pad % 8) + 1;
+                strcpy(display_line[0], "Arrived 0X");
+                display_line[0][9] = (char)('0' + arrived_pad);
+                display_changed = TRUE;
+                USB_transmit_string("CMD: A pad\r\n");
+                p += CMD_PAYLOAD_LEN;
+                queued_count = 1;
+                continue;
+            }
 
             if(!cmd_queue_push(dir, time_units)){
                 USB_transmit_string("ERR: queue full\r\n");
