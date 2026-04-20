@@ -260,6 +260,17 @@
 #define ARC_OUTER_SPEED             (30000) // Outer wheel PWM during arc seek
 #define ARC_INNER_SPEED             (15000) // Inner wheel PWM during arc seek
 
+//------------------------------------------------------------------------------
+// White-surface confirmation gate (arc-seek only).  Before looking for the
+// black line, the car must first confirm it's driving over the white board
+// (not random floor patterns).  Both sensors must read within LF_WHITE_MARGIN
+// of their calibrated white values for LF_WHITE_CONFIRM_COUNT consecutive
+// main-loop passes (~0.25 s at 8000 iter/s).
+//------------------------------------------------------------------------------
+#define LF_WHITE_MARGIN             (200)   // ADC counts above calibrated white
+                                            // that still count as "clearly white"
+#define LF_WHITE_CONFIRM_COUNT      (2000)  // ~0.25 s of sustained white reading
+
 #define LF_EXIT_STOP_TIME           (3)     // 0.6 s pause before exit turn
 #define LF_EXIT_TURN_TIME           (5)     // 1 s left spin (tune for ~90°)
 #define LF_EXIT_FWD_TIME            (10)    // 2 s forward drive into circle center

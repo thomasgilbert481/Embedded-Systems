@@ -285,14 +285,15 @@ void Calibration_Tick(void){
 //==============================================================================
 
 // Sub-states for the line-follow sequence
-#define LF_SEEK       (0)
-#define LF_PAUSE      (1)
-#define LF_ALIGN      (2)
-#define LF_FOLLOW     (3)
-#define LF_EXIT_STOP  (4)
-#define LF_EXIT_TURN  (5)
-#define LF_EXIT_FWD   (6)
-#define LF_EXIT_DONE  (7)
+#define LF_SEEK_WHITE (0)   // Arc-seek: confirm white surface before looking for black
+#define LF_SEEK       (1)
+#define LF_PAUSE      (2)
+#define LF_ALIGN      (3)
+#define LF_FOLLOW     (4)
+#define LF_EXIT_STOP  (5)
+#define LF_EXIT_TURN  (6)
+#define LF_EXIT_FWD   (7)
+#define LF_EXIT_DONE  (8)
 
 static unsigned char lf_sub_state  = LF_SEEK;
 static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase began
@@ -300,6 +301,7 @@ static unsigned char lf_spin_cw    = 0;         // 1 = left sensor saw line firs
 static int           lf_last_error = 0;         // PD state: previous error term
 // Seek mode: 0 = straight (^N), 1 = right arc (^H), 2 = left arc (^J)
 static unsigned char lf_seek_mode  = 0;
+static unsigned int  lf_white_cnt  = 0;   // Consecutive white-surface iterations
 // (lf_off_line_cnt and lf_diag_mode were used by the old
 // normalized-PD implementation; Project_7's port doesn't need them.)
 
@@ -351,8 +353,10 @@ void Line_Follow_Start(unsigned int seconds, unsigned char seek_mode){
     lf_last_error    = 0;
     lf_seek_mode     = seek_mode;       // 0=straight, 1=right arc, 2=left arc
 
-    // Begin SEEK using P9P2 mapping.
-    lf_sub_state  = LF_SEEK;
+    // Arc seeks start in LF_SEEK_WHITE (must confirm white surface first).
+    // Straight seek skips directly to LF_SEEK (black detection).
+    lf_white_cnt  = 0;
+    lf_sub_state  = (lf_seek_mode != 0) ? LF_SEEK_WHITE : LF_SEEK;
     lf_phase_tick = Time_Sequence;
 
     switch(lf_seek_mode){
@@ -519,10 +523,33 @@ void Line_Follow_Tick(void){
     switch(lf_sub_state){
 
     //--------------------------------------------------------------------------
-    // LF_SEEK -- P7_FORWARD equivalent.  Drive forward until either sensor
-    // crosses its calibrated threshold.  Ignore sensors for the first
-    // LF_SEEK_GUARD_TICKS to let the car start moving past any residual
-    // reading.
+    // LF_SEEK_WHITE -- Arc-seek only.  While driving in the rainbow arc,
+    // wait until BOTH sensors read near their calibrated white values for
+    // LF_WHITE_CONFIRM_COUNT consecutive main-loop iterations (~0.25 s).
+    // This confirms the car has reached the white board surface and isn't
+    // still on the floor (which might have dark spots that trigger false
+    // black detection).  Once confirmed, transitions to LF_SEEK to look
+    // for the actual black line.
+    //--------------------------------------------------------------------------
+    case LF_SEEK_WHITE:
+        if((ADC_Left_Detect  < (white_left  + LF_WHITE_MARGIN)) &&
+           (ADC_Right_Detect < (white_right + LF_WHITE_MARGIN))){
+            lf_white_cnt++;
+            if(lf_white_cnt >= LF_WHITE_CONFIRM_COUNT){
+                // White surface confirmed -- now look for black line.
+                USB_transmit_string("WHITE ok\r\n");
+                lf_sub_state  = LF_SEEK;
+                lf_phase_tick = Time_Sequence;
+            }
+        } else {
+            lf_white_cnt = 0;   // reset if sensors aren't on white
+        }
+        break;
+
+    //--------------------------------------------------------------------------
+    // LF_SEEK -- Drive until either sensor crosses its calibrated threshold
+    // (black line detected).  Ignore sensors for the first LF_SEEK_GUARD_TICKS
+    // to let the car start moving past any residual reading.
     //--------------------------------------------------------------------------
     case LF_SEEK:
         if(phase_elapsed >= LF_SEEK_GUARD_TICKS &&
