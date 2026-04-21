@@ -495,17 +495,18 @@ void Parse_IPD_Command(char *line){
                 continue;
             }
             if(dir == CMD_DIR_ARRIVED){
-                // Cycle "Arrived 0X" display on LCD line 1, X wraps 01..08.
-                // Blank lines 2-4 for readability (IP already known by now).
                 static unsigned char arrived_pad = 0;
-                arrived_pad = (arrived_pad % 8) + 1;
-                strcpy(display_line[0], "Arrived 0X");
+                strcpy(display_line[0], "Arrived  X");
                 display_line[0][9] = (char)('0' + arrived_pad);
                 strcpy(display_line[1], "          ");
                 strcpy(display_line[2], "          ");
                 strcpy(display_line[3], "          ");
                 display_changed = TRUE;
                 USB_transmit_string("CMD: A pad\r\n");
+                arrived_pad++;
+                if(arrived_pad > 8){
+                    arrived_pad = 0;
+                }
                 p += CMD_PAYLOAD_LEN;
                 queued_count = 1;
                 continue;
