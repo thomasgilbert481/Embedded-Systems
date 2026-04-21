@@ -287,13 +287,14 @@ void Calibration_Tick(void){
 // Sub-states for the line-follow sequence
 #define LF_SEEK_WHITE (0)   // Arc-seek: confirm white surface before looking for black
 #define LF_SEEK       (1)
-#define LF_PAUSE      (2)
-#define LF_ALIGN      (3)
-#define LF_FOLLOW     (4)
-#define LF_EXIT_STOP  (5)
-#define LF_EXIT_TURN  (6)
-#define LF_EXIT_FWD   (7)
-#define LF_EXIT_DONE  (8)
+#define LF_PAUSE      (2)   // Brief stop after detection
+#define LF_FOUND_WAIT (3)   // Display "Black line found!" and wait 10 s
+#define LF_ALIGN      (4)
+#define LF_FOLLOW     (5)
+#define LF_EXIT_STOP  (6)
+#define LF_EXIT_TURN  (7)
+#define LF_EXIT_FWD   (8)
+#define LF_EXIT_DONE  (9)
 
 static unsigned char lf_sub_state  = LF_SEEK;
 static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase began
@@ -358,6 +359,15 @@ void Line_Follow_Start(unsigned int seconds, unsigned char seek_mode){
     lf_white_cnt  = 0;
     lf_sub_state  = (lf_seek_mode != 0) ? LF_SEEK_WHITE : LF_SEEK;
     lf_phase_tick = Time_Sequence;
+
+    // Display "Black Line Start" on LCD for arc seeks (^H / ^J).
+    if(lf_seek_mode != 0){
+        strcpy(display_line[0], "Black Line");
+        strcpy(display_line[1], "  Start   ");
+        strcpy(display_line[2], "          ");
+        strcpy(display_line[3], "          ");
+        display_changed = TRUE;
+    }
 
     switch(lf_seek_mode){
         case 1:  // Right arc: left=outer(fast), right=inner(slow)
@@ -558,11 +568,7 @@ void Line_Follow_Tick(void){
             Wheels_All_Off();
             USB_transmit_string("LINE detected\r\n");
 
-            // Decide which way to spin during ALIGN to face along the line.
-            // For arc seeks the alignment direction is known a priori:
-            //   Right arc (^H) -> car approached from the right -> spin LEFT (CCW)
-            //   Left  arc (^J) -> car approached from the left  -> spin RIGHT (CW)
-            // For straight (^N) -> use whichever sensor saw it first (original logic).
+            // Decide alignment spin direction.
             if(lf_seek_mode == 1){
                 lf_spin_cw = 0;   // align LEFT after right-arc
             } else if(lf_seek_mode == 2){
@@ -571,19 +577,34 @@ void Line_Follow_Tick(void){
                 lf_spin_cw = (ADC_Left_Detect > ADC_Right_Detect) ? 1 : 0;
             }
 
-            lf_sub_state  = LF_PAUSE;
+            // Display "Black line found!" and go to the 10 s wait.
+            strcpy(display_line[0], "Black line");
+            strcpy(display_line[1], "  found!  ");
+            strcpy(display_line[2], "          ");
+            strcpy(display_line[3], "          ");
+            display_changed = TRUE;
+
+            lf_sub_state  = LF_FOUND_WAIT;
             lf_phase_tick = Time_Sequence;
         }
-        // (Forward_On() was already called in Line_Follow_Start; motors keep running)
         break;
 
     //--------------------------------------------------------------------------
-    // LF_PAUSE -- P7_DETECTED_STOP equivalent.  Motors off, wait ~1 s.
-    // Still on P9P2 pin layout -- both wheels respond.
+    // LF_FOUND_WAIT -- Motors off, display "Black line found!", wait 10 s
+    // (LF_FOUND_WAIT_TIME ticks) before turning and following.
+    //--------------------------------------------------------------------------
+    case LF_FOUND_WAIT:
+        if(phase_elapsed >= LF_FOUND_WAIT_TIME){
+            lf_sub_state  = LF_PAUSE;
+            lf_phase_tick = Time_Sequence;
+        }
+        break;
+
+    //--------------------------------------------------------------------------
+    // LF_PAUSE -- Brief stop then start alignment spin.
     //--------------------------------------------------------------------------
     case LF_PAUSE:
         if(phase_elapsed >= P7_DETECT_STOP_TIME){
-            // Spin toward the side that saw the line (P9P2 Spin functions).
             if(lf_spin_cw){
                 Spin_CW_On();
             } else {

@@ -274,6 +274,8 @@
 #define LF_EXIT_STOP_TIME           (3)     // 0.6 s pause before exit turn
 #define LF_EXIT_TURN_TIME           (5)     // 1 s left spin (tune for ~90°)
 #define LF_EXIT_FWD_TIME            (10)    // 2 s forward drive into circle center
+#define LF_FOUND_WAIT_TIME          (50)    // 10 s pause after "Black line found!"
+                                            // (50 ticks * 200 ms = 10 s)
 
 //------------------------------------------------------------------------------
 // Motor command countdown -- decrement step in CCR0 ISR (every 200 ms)
