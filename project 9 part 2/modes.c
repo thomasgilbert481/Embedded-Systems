@@ -548,11 +548,16 @@ void Line_Follow_Tick(void){
             if(lf_white_cnt >= LF_WHITE_CONFIRM_COUNT){
                 // White surface confirmed -- now look for black line.
                 USB_transmit_string("WHITE ok\r\n");
+                strcpy(display_line[0], "White Brd ");
+                strcpy(display_line[1], " Detected ");
+                strcpy(display_line[2], "Searching ");
+                strcpy(display_line[3], "for Black ");
+                display_changed = TRUE;
                 lf_sub_state  = LF_SEEK;
                 lf_phase_tick = Time_Sequence;
             }
         } else {
-            lf_white_cnt = 0;   // reset if sensors aren't on white
+            lf_white_cnt = 0;
         }
         break;
 
