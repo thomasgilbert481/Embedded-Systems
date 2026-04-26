@@ -276,6 +276,9 @@
 #define LF_EXIT_FWD_TIME            (10)    // 2 s forward drive into circle center
 #define LF_FOUND_WAIT_TIME          (50)    // 10 s pause after "Black line found!"
                                             // (50 ticks * 200 ms = 10 s)
+#define LF_CIRCLE_DISPLAY_TIME      (8)     // 1.6 s after follow starts, switch
+                                            // LCD to "Following on Circle"
+                                            // (8 ticks * 200 ms = 1.6 s, ~1.5 s)
 
 //------------------------------------------------------------------------------
 // Motor command countdown -- decrement step in CCR0 ISR (every 200 ms)

@@ -418,20 +418,11 @@ static unsigned int lf_last_left_spd  = 0;
 static unsigned int lf_last_right_spd = 0;
 static int          lf_last_ln        = 0;     // |err|
 static int          lf_last_rn        = 0;     // |correction|
+static unsigned char lf_circle_shown  = 0;     // 1 once "Following on Circle" displayed
 
-static void line_follow_display(int unused_l, int unused_r){
-    (void)unused_l;
-    (void)unused_r;
-    if(++line_dbg_cnt < LINE_DBG_INTERVAL){
-        return;
-    }
-    line_dbg_cnt = 0;
-    lcd_write_value(0, "Er", (unsigned int)(lf_last_ln < 0 ? 0 : lf_last_ln));
-    lcd_write_value(1, "Cr", (unsigned int)(lf_last_rn < 0 ? 0 : lf_last_rn));
-    lcd_write_value(2, "Ls", lf_last_left_spd);
-    lcd_write_value(3, "Rs", lf_last_right_spd);
-    display_changed = TRUE;
-}
+// No more periodic IR diagnostic on LCD during follow.  Instead, status
+// messages are set once at each state transition and persist until the
+// next transition overwrites them.
 
 //------------------------------------------------------------------------------
 // Pin / CCR mode switch.  Line-follow uses Project_7's layout; everything else
@@ -630,18 +621,30 @@ void Line_Follow_Tick(void){
         if((ADC_Left_Detect  > threshold_left) &&
            (ADC_Right_Detect > threshold_right)){
             Wheels_All_Off();
-            lf_enter_p7_pins();              // Switch to P7 pin layout NOW
+            lf_enter_p7_pins();
             USB_transmit_string("LINE follow\r\n");
-            lf_last_error = 0;
-            lf_sub_state  = LF_FOLLOW;
-            lf_phase_tick = Time_Sequence;
+            lf_last_error    = 0;
+            lf_circle_shown  = 0;
+            lf_sub_state     = LF_FOLLOW;
+            lf_phase_tick    = Time_Sequence;
+            strcpy(display_line[0], " Following");
+            strcpy(display_line[1], "Black Line");
+            strcpy(display_line[2], "          ");
+            strcpy(display_line[3], "          ");
+            display_changed = TRUE;
         } else if(phase_elapsed >= P7_INITIAL_TURN_TIME){
             Wheels_All_Off();
-            lf_enter_p7_pins();              // Switch to P7 pin layout NOW
+            lf_enter_p7_pins();
             USB_transmit_string("LINE follow\r\n");
-            lf_last_error = 0;
-            lf_sub_state  = LF_FOLLOW;
-            lf_phase_tick = Time_Sequence;
+            lf_last_error    = 0;
+            lf_circle_shown  = 0;
+            lf_sub_state     = LF_FOLLOW;
+            lf_phase_tick    = Time_Sequence;
+            strcpy(display_line[0], " Following");
+            strcpy(display_line[1], "Black Line");
+            strcpy(display_line[2], "          ");
+            strcpy(display_line[3], "          ");
+            display_changed = TRUE;
         }
         break;
 
@@ -658,8 +661,16 @@ void Line_Follow_Tick(void){
         int base_err;
         int delta_err;
 
-        // Refresh the LCD display (rate-limited internally).
-        line_follow_display(0, 0);
+        // After LF_CIRCLE_DISPLAY_TIME, switch LCD to "Following on Circle"
+        // permanently (until exit or quit).
+        if(!lf_circle_shown && phase_elapsed >= LF_CIRCLE_DISPLAY_TIME){
+            lf_circle_shown = 1;
+            strcpy(display_line[0], " Following");
+            strcpy(display_line[1], " on Circle");
+            strcpy(display_line[2], "          ");
+            strcpy(display_line[3], "          ");
+            display_changed = TRUE;
+        }
 
         // Both sensors off line -- reverse to re-find it (Project_7 behaviour).
         if(!left_on_line && !right_on_line){
