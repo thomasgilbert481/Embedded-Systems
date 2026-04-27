@@ -424,61 +424,34 @@ static int          lf_last_ln        = 0;
 static int          lf_last_rn        = 0;
 
 //------------------------------------------------------------------------------
-// Helper: set LCD line 1 to the event string, lines 2-3 to the IP address,
-// line 4 to the elapsed seconds.  Called at every state transition and
-// periodically during follow to keep the seconds counter live.
+// Helper: set LCD to show ONLY the event string (centered on line 1, all
+// other lines blank).  Then blink the LCD twice so the TA notices the change.
+//
+// Blink is done by toggling the backlight off/on twice with a busy-wait
+// delay.  The delay is crude but short (~100ms per toggle) and only fires
+// on state transitions (not every main-loop iter).
 //------------------------------------------------------------------------------
+static void lf_blink_delay(void){
+    volatile unsigned long d;
+    for(d = 80000UL; d > 0; d--);   // ~100 ms at 8 MHz
+}
+
 static void lf_set_display(const char *event){
-    unsigned int secs;
-    unsigned int tens;
-    unsigned int ones;
-    unsigned int hunds;
-
-    // Line 1: event
+    // Line 1: event message.  Lines 2-4: blank.
     strcpy(display_line[0], event);
-
-    // Lines 2-3: IP address (already split in car_ip by Display_Network_Info)
-    // Re-split from car_ip to keep it fresh.
-    {
-        unsigned int i;
-        char dot_count = 0;
-        int  split_idx = -1;
-        char hi[11] = "          ";
-        char lo[11] = "          ";
-
-        for(i = 0; car_ip[i] != SERIAL_NULL && i < sizeof(car_ip); i++){
-            if(car_ip[i] == '.'){
-                dot_count++;
-                if(dot_count == 2){ split_idx = (int)i; break; }
-            }
-        }
-        if(split_idx >= 0){
-            for(i = 0; i < (unsigned int)split_idx && i < 10; i++){
-                hi[i] = car_ip[i];
-            }
-            {
-                unsigned int j = 0, k = (unsigned int)split_idx + 1;
-                while(car_ip[k] != SERIAL_NULL && j < 10){
-                    lo[j++] = car_ip[k++];
-                }
-            }
-        }
-        strcpy(display_line[1], hi);
-        strcpy(display_line[2], lo);
-    }
-
-    // Line 4: "Time: XXXs" elapsed seconds
-    secs = (unsigned int)(lf_ticks / 5);
-    if(secs > 999) secs = 999;
-    hunds = secs / 100;  secs -= hunds * 100;
-    tens  = secs / 10;   secs -= tens  * 10;
-    ones  = secs;
-    strcpy(display_line[3], "Time: XXXs");
-    display_line[3][6] = (char)('0' + hunds);
-    display_line[3][7] = (char)('0' + tens);
-    display_line[3][8] = (char)('0' + ones);
-
+    strcpy(display_line[1], "          ");
+    strcpy(display_line[2], "          ");
+    strcpy(display_line[3], "          ");
     display_changed = TRUE;
+
+    // Force an immediate LCD refresh so the text is visible before the blink.
+    Display_Process();
+
+    // Blink backlight twice: OFF-ON-OFF-ON.
+    P6OUT &= ~LCD_BACKLITE;   lf_blink_delay();
+    P6OUT |=  LCD_BACKLITE;   lf_blink_delay();
+    P6OUT &= ~LCD_BACKLITE;   lf_blink_delay();
+    P6OUT |=  LCD_BACKLITE;
 }
 
 //------------------------------------------------------------------------------
@@ -788,7 +761,9 @@ void Line_Follow_Tick(void){
                 h = secs / 100; secs -= h * 100;
                 t = secs / 10;  secs -= t * 10;
                 o = secs;
-                strcpy(display_line[0], " BL Stop  ");
+                // Use lf_set_display for the blink, then overwrite lines 2-4
+                // with the custom finish message + time.
+                lf_set_display(" BL Stop  ");
                 strcpy(display_line[1], " That was ");
                 strcpy(display_line[2], " easy! :) ");
                 strcpy(display_line[3], "Time: XXXs");
