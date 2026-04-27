@@ -278,7 +278,7 @@
 #define LF_EVENT_PAUSE              (50)    // 10 s between events (50*200ms)
 #define LF_TRAVEL_TO_CIRCLE         (75)    // 15 s of following before the
                                             // "BL Travel" -> "BL Circle" pause
-#define LF_EXIT_TURN_TIME           (5)     // 1 s left spin (tune for ~90)
+#define LF_EXIT_TURN_TIME           (2)     // 0.4 s left spin (tuned for ~90)
 #define LF_EXIT_FWD_TIME            (10)    // 2 s forward drive into center
 
 //------------------------------------------------------------------------------
