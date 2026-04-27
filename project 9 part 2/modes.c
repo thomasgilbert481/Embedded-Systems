@@ -373,6 +373,10 @@ void Line_Follow_Start(unsigned int seconds, unsigned char seek_mode){
 
     lf_set_display(" BL Start ");
 
+    // Debug: show sensor status on line 4 during seek.
+    strcpy(display_line[3], "Sensor off");
+    display_changed = TRUE;
+
     switch(lf_seek_mode){
         case 1:  // Right arc: left=outer(fast), right=inner(slow)
             LEFT_REVERSE_SPEED  = WHEEL_OFF;
@@ -566,6 +570,8 @@ void Line_Follow_Tick(void){
            (ADC_Right_Detect < (white_right + LF_WHITE_MARGIN))){
             lf_white_cnt++;
             if(lf_white_cnt >= LF_WHITE_CONFIRM_COUNT){
+                strcpy(display_line[3], "white brd ");
+                display_changed = TRUE;
                 lf_sub_state  = LF_SEEK;
                 lf_phase_tick = Time_Sequence;
             }
