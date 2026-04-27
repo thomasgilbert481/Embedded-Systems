@@ -346,11 +346,12 @@ void Line_Follow_Start(unsigned int seconds, unsigned char seek_mode){
     ir_emitter_on = 1;
 
     // seconds=0 means "follow indefinitely until ^Q or ^G".
-    // Use max unsigned int (~65 seconds at 200ms tick) as the countdown;
-    // Vehicle_Cmd_Tick will decrement but the user sends ^Q long before
-    // it expires.  If they don't, the car just stops after ~65 s.
+    // Set cmd_remaining_ms to max 16-bit value = 65535 ms = ~65 s.
+    // Vehicle_Cmd_Tick decrements 200 ms per tick.  If the user hasn't
+    // sent ^Q or ^G by then, the car stops.  For longer runs, send a
+    // nonzero time: ^1234H3000 = 300 s = 5 min.
     if(seconds == 0){
-        cmd_remaining_ms = 65000u;  // ~65 s fallback
+        cmd_remaining_ms = 65535u;
     } else {
         cmd_remaining_ms = seconds * 1000u;
     }
