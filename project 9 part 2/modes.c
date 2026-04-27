@@ -110,8 +110,8 @@ static void lcd_write_value(unsigned int line_idx, const char *label, unsigned i
 // Line-follow LCD update counters (declared early so Line_Follow_Start can
 // reset the counter to force an immediate redraw).
 //------------------------------------------------------------------------------
-static unsigned long line_dbg_cnt = 0;
-#define LINE_DBG_INTERVAL 2000
+// (line_dbg_cnt and LINE_DBG_INTERVAL removed -- no longer showing IR
+// diagnostic during follow; using event-based status messages instead.)
 
 //------------------------------------------------------------------------------
 // Show all four calibration values on the LCD (used at end of cal)
@@ -285,16 +285,20 @@ void Calibration_Tick(void){
 //==============================================================================
 
 // Sub-states for the line-follow sequence
-#define LF_SEEK_WHITE (0)   // Arc-seek: confirm white surface before looking for black
-#define LF_SEEK       (1)
-#define LF_PAUSE      (2)   // Brief stop after detection
-#define LF_FOUND_WAIT (3)   // Display "Black line found!" and wait 10 s
-#define LF_ALIGN      (4)
-#define LF_FOLLOW     (5)
-#define LF_EXIT_STOP  (6)
-#define LF_EXIT_TURN  (7)
-#define LF_EXIT_FWD   (8)
-#define LF_EXIT_DONE  (9)
+// Sub-states for the line-follow sequence.  Each "WAIT" state = motors off,
+// display the event message, sit for LF_EVENT_PAUSE ticks so the TA can read.
+#define LF_SEEK_WHITE      (0)   // Arc: confirm white board first
+#define LF_SEEK            (1)   // "BL Start" - hunting for black line
+#define LF_INTERCEPT_WAIT  (2)   // "Intercept" - stopped 10 s
+#define LF_TURN            (3)   // "BL Turn"   - spinning to align
+#define LF_TURN_WAIT       (4)   // "BL Turn"   - stopped 10 s after turn
+#define LF_TRAVEL          (5)   // "BL Travel" - following the line
+#define LF_TRAVEL_WAIT     (6)   // "BL Travel" - stopped 10 s
+#define LF_CIRCLE          (7)   // "BL Circle" - following around the circle
+#define LF_EXIT_WAIT       (8)   // "BL Exit"   - stopped 10 s
+#define LF_EXIT_TURN       (9)   // "BL Exit"   - spinning left
+#define LF_EXIT_FWD        (10)  // "BL Exit"   - driving forward
+#define LF_EXIT_DONE       (11)  // "BL Stop"   + custom message + time
 
 static unsigned char lf_sub_state  = LF_SEEK;
 static unsigned int  lf_phase_tick = 0;         // Time_Sequence when phase began
@@ -303,6 +307,10 @@ static int           lf_last_error = 0;         // PD state: previous error term
 // Seek mode: 0 = straight (^N), 1 = right arc (^H), 2 = left arc (^J)
 static unsigned char lf_seek_mode  = 0;
 static unsigned int  lf_white_cnt  = 0;   // Consecutive white-surface iterations
+
+// Elapsed-time tracking for the seconds counter on LCD line 4.
+static unsigned int  lf_last_ts    = 0;   // Last seen Time_Sequence value
+static unsigned long lf_ticks      = 0;   // 200 ms ticks since autonomous start
 // (lf_off_line_cnt and lf_diag_mode were used by the old
 // normalized-PD implementation; Project_7's port doesn't need them.)
 
@@ -350,24 +358,19 @@ void Line_Follow_Start(unsigned int seconds, unsigned char seek_mode){
     cmd_active_dir   = CMD_DIR_LINE_FOLLOW;
     cmd_active_time  = (seconds == 0) ? 650u : seconds * 10;
     mode_line_active = 1;
-    line_dbg_cnt     = LINE_DBG_INTERVAL;
     lf_last_error    = 0;
-    lf_seek_mode     = seek_mode;       // 0=straight, 1=right arc, 2=left arc
+    lf_seek_mode     = seek_mode;
 
-    // Arc seeks start in LF_SEEK_WHITE (must confirm white surface first).
-    // Straight seek skips directly to LF_SEEK (black detection).
+    // Start elapsed timer
+    lf_last_ts = Time_Sequence;
+    lf_ticks   = 0;
+
+    // Arc seeks start in LF_SEEK_WHITE; straight goes to LF_SEEK.
     lf_white_cnt  = 0;
     lf_sub_state  = (lf_seek_mode != 0) ? LF_SEEK_WHITE : LF_SEEK;
     lf_phase_tick = Time_Sequence;
 
-    // Display "Black Line Start" on LCD for arc seeks (^H / ^J).
-    if(lf_seek_mode != 0){
-        strcpy(display_line[0], "Black Line");
-        strcpy(display_line[1], "  Start   ");
-        strcpy(display_line[2], "          ");
-        strcpy(display_line[3], "          ");
-        display_changed = TRUE;
-    }
+    lf_set_display(" BL Start ");
 
     switch(lf_seek_mode){
         case 1:  // Right arc: left=outer(fast), right=inner(slow)
@@ -402,7 +405,8 @@ void Line_Follow_Begin_Exit(void){
     lf_exit_p7_pins();           // restore P9P2 pin layout
     Wheels_All_Off();            // defensive: zero P9P2 CCRs too
     cmd_remaining_ms = 65000u;   // extend countdown so exit sequence has time
-    lf_sub_state  = LF_EXIT_STOP;
+    lf_set_display(" BL Exit  ");
+    lf_sub_state  = LF_EXIT_WAIT;
     lf_phase_tick = Time_Sequence;
     USB_transmit_string("LINE exit\r\n");
 }
@@ -416,13 +420,66 @@ void Line_Follow_Begin_Exit(void){
 //------------------------------------------------------------------------------
 static unsigned int lf_last_left_spd  = 0;
 static unsigned int lf_last_right_spd = 0;
-static int          lf_last_ln        = 0;     // |err|
-static int          lf_last_rn        = 0;     // |correction|
-static unsigned char lf_circle_shown  = 0;     // 1 once "Following on Circle" displayed
+static int          lf_last_ln        = 0;
+static int          lf_last_rn        = 0;
 
-// No more periodic IR diagnostic on LCD during follow.  Instead, status
-// messages are set once at each state transition and persist until the
-// next transition overwrites them.
+//------------------------------------------------------------------------------
+// Helper: set LCD line 1 to the event string, lines 2-3 to the IP address,
+// line 4 to the elapsed seconds.  Called at every state transition and
+// periodically during follow to keep the seconds counter live.
+//------------------------------------------------------------------------------
+static void lf_set_display(const char *event){
+    unsigned int secs;
+    unsigned int tens;
+    unsigned int ones;
+    unsigned int hunds;
+
+    // Line 1: event
+    strcpy(display_line[0], event);
+
+    // Lines 2-3: IP address (already split in car_ip by Display_Network_Info)
+    // Re-split from car_ip to keep it fresh.
+    {
+        unsigned int i;
+        char dot_count = 0;
+        int  split_idx = -1;
+        char hi[11] = "          ";
+        char lo[11] = "          ";
+
+        for(i = 0; car_ip[i] != SERIAL_NULL && i < sizeof(car_ip); i++){
+            if(car_ip[i] == '.'){
+                dot_count++;
+                if(dot_count == 2){ split_idx = (int)i; break; }
+            }
+        }
+        if(split_idx >= 0){
+            for(i = 0; i < (unsigned int)split_idx && i < 10; i++){
+                hi[i] = car_ip[i];
+            }
+            {
+                unsigned int j = 0, k = (unsigned int)split_idx + 1;
+                while(car_ip[k] != SERIAL_NULL && j < 10){
+                    lo[j++] = car_ip[k++];
+                }
+            }
+        }
+        strcpy(display_line[1], hi);
+        strcpy(display_line[2], lo);
+    }
+
+    // Line 4: "Time: XXXs" elapsed seconds
+    secs = (unsigned int)(lf_ticks / 5);
+    if(secs > 999) secs = 999;
+    hunds = secs / 100;  secs -= hunds * 100;
+    tens  = secs / 10;   secs -= tens  * 10;
+    ones  = secs;
+    strcpy(display_line[3], "Time: XXXs");
+    display_line[3][6] = (char)('0' + hunds);
+    display_line[3][7] = (char)('0' + tens);
+    display_line[3][8] = (char)('0' + ones);
+
+    display_changed = TRUE;
+}
 
 //------------------------------------------------------------------------------
 // Pin / CCR mode switch.  Line-follow uses Project_7's layout; everything else
@@ -511,39 +568,30 @@ void Line_Follow_Tick(void){
         return;
     }
     if(cmd_remaining_ms == 0){
-        // Overall countdown expired -- Vehicle_Cmd_Tick already stopped motors.
-        // Restore the P9P2 pin layout so F/B/R/L work again.
         lf_exit_p7_pins();
         mode_line_active = 0;
         Display_Network_Info();
         return;
     }
 
+    // Keep the elapsed-time counter running (200 ms per tick).
+    if(Time_Sequence != lf_last_ts){
+        lf_ticks++;
+        lf_last_ts = Time_Sequence;
+    }
+
     phase_elapsed = (unsigned int)(Time_Sequence - lf_phase_tick);
 
     switch(lf_sub_state){
 
-    //--------------------------------------------------------------------------
-    // LF_SEEK_WHITE -- Arc-seek only.  While driving in the rainbow arc,
-    // wait until BOTH sensors read near their calibrated white values for
-    // LF_WHITE_CONFIRM_COUNT consecutive main-loop iterations (~0.25 s).
-    // This confirms the car has reached the white board surface and isn't
-    // still on the floor (which might have dark spots that trigger false
-    // black detection).  Once confirmed, transitions to LF_SEEK to look
-    // for the actual black line.
-    //--------------------------------------------------------------------------
+    //----------------------------------------------------------------------
+    // "BL Start" — arc-seek: confirm white board first
+    //----------------------------------------------------------------------
     case LF_SEEK_WHITE:
         if((ADC_Left_Detect  < (white_left  + LF_WHITE_MARGIN)) &&
            (ADC_Right_Detect < (white_right + LF_WHITE_MARGIN))){
             lf_white_cnt++;
             if(lf_white_cnt >= LF_WHITE_CONFIRM_COUNT){
-                // White surface confirmed -- now look for black line.
-                USB_transmit_string("WHITE ok\r\n");
-                strcpy(display_line[0], "White Brd ");
-                strcpy(display_line[1], " Detected ");
-                strcpy(display_line[2], "Searching ");
-                strcpy(display_line[3], "for Black ");
-                display_changed = TRUE;
                 lf_sub_state  = LF_SEEK;
                 lf_phase_tick = Time_Sequence;
             }
@@ -552,170 +600,168 @@ void Line_Follow_Tick(void){
         }
         break;
 
-    //--------------------------------------------------------------------------
-    // LF_SEEK -- Drive until either sensor crosses its calibrated threshold
-    // (black line detected).  Ignore sensors for the first LF_SEEK_GUARD_TICKS
-    // to let the car start moving past any residual reading.
-    //--------------------------------------------------------------------------
+    //----------------------------------------------------------------------
+    // "BL Start" — hunting for the black line
+    //----------------------------------------------------------------------
     case LF_SEEK:
         if(phase_elapsed >= LF_SEEK_GUARD_TICKS &&
            ((ADC_Left_Detect  > threshold_left) ||
             (ADC_Right_Detect > threshold_right))){
             Wheels_All_Off();
-            USB_transmit_string("LINE detected\r\n");
 
-            // Decide alignment spin direction.
             if(lf_seek_mode == 1){
-                lf_spin_cw = 0;   // align LEFT after right-arc
+                lf_spin_cw = 0;
             } else if(lf_seek_mode == 2){
-                lf_spin_cw = 1;   // align RIGHT after left-arc
+                lf_spin_cw = 1;
             } else {
                 lf_spin_cw = (ADC_Left_Detect > ADC_Right_Detect) ? 1 : 0;
             }
 
-            // Display "Black line found!" and go to the 10 s wait.
-            strcpy(display_line[0], "Black line");
-            strcpy(display_line[1], "  found!  ");
-            strcpy(display_line[2], "          ");
-            strcpy(display_line[3], "          ");
-            display_changed = TRUE;
-
-            lf_sub_state  = LF_FOUND_WAIT;
+            lf_set_display("Intercept ");
+            lf_sub_state  = LF_INTERCEPT_WAIT;
             lf_phase_tick = Time_Sequence;
         }
         break;
 
-    //--------------------------------------------------------------------------
-    // LF_FOUND_WAIT -- Motors off, display "Black line found!", wait 10 s
-    // (LF_FOUND_WAIT_TIME ticks) before turning and following.
-    //--------------------------------------------------------------------------
-    case LF_FOUND_WAIT:
-        if(phase_elapsed >= LF_FOUND_WAIT_TIME){
-            lf_sub_state  = LF_PAUSE;
-            lf_phase_tick = Time_Sequence;
-        }
-        break;
-
-    //--------------------------------------------------------------------------
-    // LF_PAUSE -- Brief stop then start alignment spin.
-    //--------------------------------------------------------------------------
-    case LF_PAUSE:
-        if(phase_elapsed >= P7_DETECT_STOP_TIME){
+    //----------------------------------------------------------------------
+    // "Intercept" — stopped, 10 s pause for TA
+    //----------------------------------------------------------------------
+    case LF_INTERCEPT_WAIT:
+        if(phase_elapsed >= LF_EVENT_PAUSE){
+            // Start the alignment turn.
+            lf_set_display(" BL Turn  ");
             if(lf_spin_cw){
                 Spin_CW_On();
             } else {
                 Spin_CCW_On();
             }
-            USB_transmit_string("LINE align\r\n");
-            lf_sub_state  = LF_ALIGN;
+            lf_sub_state  = LF_TURN;
             lf_phase_tick = Time_Sequence;
         }
         break;
 
-    //--------------------------------------------------------------------------
-    // LF_ALIGN -- P7_TURNING equivalent.  Still on P9P2 pin layout.  Spin
-    // until both sensors cross threshold (early exit) or timer elapses.
-    // On exit: switch to Project_7 pin layout for LF_FOLLOW.
-    //--------------------------------------------------------------------------
-    case LF_ALIGN:
+    //----------------------------------------------------------------------
+    // "BL Turn" — spinning to align on line
+    //----------------------------------------------------------------------
+    case LF_TURN:
         if((ADC_Left_Detect  > threshold_left) &&
            (ADC_Right_Detect > threshold_right)){
             Wheels_All_Off();
-            lf_enter_p7_pins();
-            USB_transmit_string("LINE follow\r\n");
-            lf_last_error    = 0;
-            lf_circle_shown  = 0;
-            lf_sub_state     = LF_FOLLOW;
-            lf_phase_tick    = Time_Sequence;
-            strcpy(display_line[0], " Following");
-            strcpy(display_line[1], "Black Line");
-            strcpy(display_line[2], "          ");
-            strcpy(display_line[3], "          ");
-            display_changed = TRUE;
+            lf_sub_state  = LF_TURN_WAIT;
+            lf_phase_tick = Time_Sequence;
         } else if(phase_elapsed >= P7_INITIAL_TURN_TIME){
             Wheels_All_Off();
-            lf_enter_p7_pins();
-            USB_transmit_string("LINE follow\r\n");
-            lf_last_error    = 0;
-            lf_circle_shown  = 0;
-            lf_sub_state     = LF_FOLLOW;
-            lf_phase_tick    = Time_Sequence;
-            strcpy(display_line[0], " Following");
-            strcpy(display_line[1], "Black Line");
-            strcpy(display_line[2], "          ");
-            strcpy(display_line[3], "          ");
-            display_changed = TRUE;
+            lf_sub_state  = LF_TURN_WAIT;
+            lf_phase_tick = Time_Sequence;
         }
         break;
 
-    //--------------------------------------------------------------------------
-    // LF_FOLLOW -- byte-for-byte port of Project_7/Follow_Line using direct
-    // CCR writes on the P7 pin layout.
-    //--------------------------------------------------------------------------
-    case LF_FOLLOW:
+    //----------------------------------------------------------------------
+    // "BL Turn" — stopped after turn, 10 s pause for TA
+    //----------------------------------------------------------------------
+    case LF_TURN_WAIT:
+        if(phase_elapsed >= LF_EVENT_PAUSE){
+            // Switch to P7 pin layout and start PD following.
+            lf_enter_p7_pins();
+            lf_last_error = 0;
+            lf_set_display("BL Travel ");
+            lf_sub_state  = LF_TRAVEL;
+            lf_phase_tick = Time_Sequence;
+        }
+        break;
+
+    //----------------------------------------------------------------------
+    // "BL Travel" — following the line, after LF_TRAVEL_TO_CIRCLE ticks
+    //               stop for the BL Circle pause.
+    //----------------------------------------------------------------------
+    case LF_TRAVEL:
     {
         int left_reading  = (int)ADC_Left_Detect;
         int right_reading = (int)ADC_Right_Detect;
         unsigned int left_on_line  = (ADC_Left_Detect  > threshold_left);
         unsigned int right_on_line = (ADC_Right_Detect > threshold_right);
-        int base_err;
-        int delta_err;
+        int base_err, delta_err;
 
-        // After LF_CIRCLE_DISPLAY_TIME, switch LCD to "Following on Circle"
-        // permanently (until exit or quit).
-        if(!lf_circle_shown && phase_elapsed >= LF_CIRCLE_DISPLAY_TIME){
-            lf_circle_shown = 1;
-            strcpy(display_line[0], " Following");
-            strcpy(display_line[1], " on Circle");
-            strcpy(display_line[2], "          ");
-            strcpy(display_line[3], "          ");
-            display_changed = TRUE;
-        }
-
-        // Both sensors off line -- reverse to re-find it (Project_7 behaviour).
-        if(!left_on_line && !right_on_line){
-            lf_motors_reverse(P7_REVERSE_SPEED);
-            lf_last_left_spd  = 0;
-            lf_last_right_spd = 0;
-            // Do NOT update lf_last_error -- preserve for re-acquisition.
+        if(phase_elapsed >= LF_TRAVEL_TO_CIRCLE){
+            // Time to pause for "BL Circle" transition.
+            lf_motors_stop();
+            lf_exit_p7_pins();              // back to P9P2 for the pause
+            lf_set_display("BL Travel ");   // keep showing Travel during pause
+            lf_sub_state  = LF_TRAVEL_WAIT;
+            lf_phase_tick = Time_Sequence;
             break;
         }
 
-        // At least one sensor sees the line -- PD forward control.
+        // PD control (Project_7 style, direct CCR writes).
+        if(!left_on_line && !right_on_line){
+            lf_motors_reverse(P7_REVERSE_SPEED);
+            break;
+        }
         base_err      = left_reading - right_reading;
         delta_err     = base_err - lf_last_error;
         lf_last_error = base_err;
-
         correction = (P7_KP * base_err) + (P7_KD * delta_err);
         correction = correction / P7_PD_DIVISOR;
-
         left_speed  = (int)P7_BASE_SPEED - correction;
         right_speed = (int)P7_BASE_SPEED + correction;
-
-        if(left_speed  < 0)                    left_speed  = 0;
-        if(right_speed < 0)                    right_speed = 0;
-        if(left_speed  > (int)P7_MAX_SPEED)    left_speed  = (int)P7_MAX_SPEED;
-        if(right_speed > (int)P7_MAX_SPEED)    right_speed = (int)P7_MAX_SPEED;
-
+        if(left_speed  < 0)                 left_speed  = 0;
+        if(right_speed < 0)                 right_speed = 0;
+        if(left_speed  > (int)P7_MAX_SPEED) left_speed  = (int)P7_MAX_SPEED;
+        if(right_speed > (int)P7_MAX_SPEED) right_speed = (int)P7_MAX_SPEED;
         lf_motors_forward((unsigned int)left_speed, (unsigned int)right_speed);
-
-        // Snapshot for LCD display
-        lf_last_ln        = base_err >= 0 ? base_err : -base_err;   // |err|
-        lf_last_rn        = correction >= 0 ? correction : -correction;
-        lf_last_left_spd  = (unsigned int)left_speed;
-        lf_last_right_spd = (unsigned int)right_speed;
     } break;
 
-    //--------------------------------------------------------------------------
-    // EXIT SEQUENCE (triggered by ^G during line-follow):
-    //   stop → spin left ~90° → drive forward → stop → display DONE
-    // These states run on the P9P2 pin layout (lf_exit_p7_pins already
-    // called by Line_Follow_Begin_Exit) so both wheels drive.
-    //--------------------------------------------------------------------------
-    case LF_EXIT_STOP:
-        Wheels_All_Off();
-        if(phase_elapsed >= LF_EXIT_STOP_TIME){
-            Spin_CCW_On();   // Left turn (CCW) on P9P2 pins
+    //----------------------------------------------------------------------
+    // "BL Travel" — stopped, 10 s pause before "BL Circle"
+    //----------------------------------------------------------------------
+    case LF_TRAVEL_WAIT:
+        if(phase_elapsed >= LF_EVENT_PAUSE){
+            lf_enter_p7_pins();
+            lf_last_error = 0;
+            lf_set_display("BL Circle ");
+            lf_sub_state  = LF_CIRCLE;
+            lf_phase_tick = Time_Sequence;
+        }
+        break;
+
+    //----------------------------------------------------------------------
+    // "BL Circle" — following the circle indefinitely until ^G exit.
+    //----------------------------------------------------------------------
+    case LF_CIRCLE:
+    {
+        int left_reading  = (int)ADC_Left_Detect;
+        int right_reading = (int)ADC_Right_Detect;
+        unsigned int left_on_line  = (ADC_Left_Detect  > threshold_left);
+        unsigned int right_on_line = (ADC_Right_Detect > threshold_right);
+        int base_err, delta_err;
+
+        if(!left_on_line && !right_on_line){
+            lf_motors_reverse(P7_REVERSE_SPEED);
+            break;
+        }
+        base_err      = left_reading - right_reading;
+        delta_err     = base_err - lf_last_error;
+        lf_last_error = base_err;
+        correction = (P7_KP * base_err) + (P7_KD * delta_err);
+        correction = correction / P7_PD_DIVISOR;
+        left_speed  = (int)P7_BASE_SPEED - correction;
+        right_speed = (int)P7_BASE_SPEED + correction;
+        if(left_speed  < 0)                 left_speed  = 0;
+        if(right_speed < 0)                 right_speed = 0;
+        if(left_speed  > (int)P7_MAX_SPEED) left_speed  = (int)P7_MAX_SPEED;
+        if(right_speed > (int)P7_MAX_SPEED) right_speed = (int)P7_MAX_SPEED;
+        lf_motors_forward((unsigned int)left_speed, (unsigned int)right_speed);
+    } break;
+
+    //----------------------------------------------------------------------
+    // EXIT SEQUENCE (triggered by ^G).  P9P2 pins already restored by
+    // Line_Follow_Begin_Exit.
+    //----------------------------------------------------------------------
+    case LF_EXIT_WAIT:
+        // "BL Exit" — stopped, 10 s pause for TA.
+        if(phase_elapsed >= LF_EVENT_PAUSE){
+            lf_set_display(" BL Exit  ");
+            Spin_CCW_On();
             lf_phase_tick = Time_Sequence;
             lf_sub_state  = LF_EXIT_TURN;
         }
@@ -724,7 +770,7 @@ void Line_Follow_Tick(void){
     case LF_EXIT_TURN:
         if(phase_elapsed >= LF_EXIT_TURN_TIME){
             Wheels_All_Off();
-            Forward_On();    // Drive forward on P9P2 pins
+            Forward_On();
             lf_phase_tick = Time_Sequence;
             lf_sub_state  = LF_EXIT_FWD;
         }
@@ -735,18 +781,28 @@ void Line_Follow_Tick(void){
             Wheels_All_Off();
             lf_phase_tick = Time_Sequence;
             lf_sub_state  = LF_EXIT_DONE;
-
-            strcpy(display_line[0], "   DONE   ");
-            strcpy(display_line[1], "          ");
-            strcpy(display_line[2], "          ");
-            strcpy(display_line[3], "          ");
-            display_changed = TRUE;
+            {
+                unsigned int secs = (unsigned int)(lf_ticks / 5);
+                unsigned int h, t, o;
+                if(secs > 999) secs = 999;
+                h = secs / 100; secs -= h * 100;
+                t = secs / 10;  secs -= t * 10;
+                o = secs;
+                strcpy(display_line[0], " BL Stop  ");
+                strcpy(display_line[1], " That was ");
+                strcpy(display_line[2], " easy! :) ");
+                strcpy(display_line[3], "Time: XXXs");
+                display_line[3][6] = (char)('0' + h);
+                display_line[3][7] = (char)('0' + t);
+                display_line[3][8] = (char)('0' + o);
+                display_changed = TRUE;
+            }
         }
         break;
 
     case LF_EXIT_DONE:
-        // Stay here briefly then clean up.
-        if(phase_elapsed >= 5){     // ~1 s of "DONE" on screen
+        // "BL Stop" stays on screen indefinitely.  Car is idle.
+        if(phase_elapsed >= 5){
             mode_line_active = 0;
             cmd_remaining_ms = 0;
             cmd_active_dir   = SERIAL_NULL;
@@ -759,6 +815,5 @@ void Line_Follow_Tick(void){
         break;
     }
 
-    // Rate diagnostic (toggles every tick while line-follow is active).
     P2OUT ^= IOT_RUN_RED;
 }
