@@ -568,6 +568,12 @@ void Vehicle_Cmd_Tick(void){
     if(cmd_remaining_ms == BEGINNING){
         return;
     }
+    // During line-follow, don't auto-decrement -- the sequence runs
+    // indefinitely until the user sends ^Q or ^G.  Line_Follow_Tick
+    // manages its own exit.
+    if(mode_line_active){
+        return;
+    }
     if(cmd_remaining_ms <= TB0_TICK_MS){
         cmd_remaining_ms = BEGINNING;
         cmd_active_dir   = SERIAL_NULL;
