@@ -380,16 +380,16 @@ void Line_Follow_Start(unsigned int seconds, unsigned char seek_mode){
     switch(lf_seek_mode){
         case 1:  // Right arc: left=outer(fast), right=inner(slow)
             LEFT_REVERSE_SPEED  = WHEEL_OFF;
-            LEFT_FORWARD_SPEED  = ARC_OUTER_SPEED;
+            LEFT_FORWARD_SPEED  = ARC_R_OUTER_SPEED;
             RIGHT_REVERSE_SPEED = WHEEL_OFF;
-            RIGHT_FORWARD_SPEED = ARC_INNER_SPEED;
+            RIGHT_FORWARD_SPEED = ARC_R_INNER_SPEED;
             USB_transmit_string("LINE seek R\r\n");
             break;
         case 2:  // Left arc: right=outer(fast), left=inner(slow)
             LEFT_REVERSE_SPEED  = WHEEL_OFF;
-            LEFT_FORWARD_SPEED  = ARC_INNER_SPEED;
+            LEFT_FORWARD_SPEED  = ARC_L_INNER_SPEED;
             RIGHT_REVERSE_SPEED = WHEEL_OFF;
-            RIGHT_FORWARD_SPEED = ARC_OUTER_SPEED;
+            RIGHT_FORWARD_SPEED = ARC_L_OUTER_SPEED;
             USB_transmit_string("LINE seek L\r\n");
             break;
         default: // Straight

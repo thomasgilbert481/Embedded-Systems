@@ -254,11 +254,13 @@
 // Outer wheel runs at ARC_OUTER, inner wheel at ARC_INNER.  The tighter
 // the ratio inner/outer, the tighter the arc.  TUNE THESE ON HARDWARE.
 //
-// For ^H (right arc): left wheel = outer (fast), right wheel = inner (slow).
-// For ^J (left arc):  right wheel = outer (fast), left wheel = inner (slow).
+// Separate values for right arc (^H) and left arc (^J) since the motors
+// aren't perfectly matched.
 //------------------------------------------------------------------------------
-#define ARC_OUTER_SPEED             (30000) // Outer wheel PWM during arc seek
-#define ARC_INNER_SPEED             (15000) // Inner wheel PWM during arc seek
+#define ARC_R_OUTER_SPEED           (30000) // ^H right arc: left wheel (outer)
+#define ARC_R_INNER_SPEED           (15000) // ^H right arc: right wheel (inner)
+#define ARC_L_OUTER_SPEED           (30000) // ^J left arc: right wheel (outer)
+#define ARC_L_INNER_SPEED           (10000) // ^J left arc: left wheel (inner)
 
 //------------------------------------------------------------------------------
 // White-surface confirmation gate (arc-seek only).  Before looking for the
