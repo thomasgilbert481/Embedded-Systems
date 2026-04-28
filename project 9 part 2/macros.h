@@ -246,9 +246,8 @@
 //------------------------------------------------------------------------------
 #define P7_DETECT_STOP_TIME         (5)     // 1 s pause after line detection
 #define P7_INITIAL_TURN_TIME        (5)     // 1 s alignment spin (tune if needed)
-#define LF_SEEK_GUARD_TICKS         (10)    // Ignore sensors for first 2 s
-                                            // after entering LF_SEEK (avoids
-                                            // detecting PAD 8 black on launch)
+#define LF_SEEK_GUARD_TICKS         (1)     // Ignore sensors briefly after
+                                            // entering LF_SEEK
 //------------------------------------------------------------------------------
 // Arc-seek: differential wheel speeds to make the car drive in a rainbow
 // (semicircle) path toward the line instead of going straight.
@@ -268,7 +267,7 @@
 // of their calibrated white values for LF_WHITE_CONFIRM_COUNT consecutive
 // main-loop passes (~0.25 s at 8000 iter/s).
 //------------------------------------------------------------------------------
-#define LF_WHITE_MARGIN             (200)   // ADC counts above calibrated white
+#define LF_WHITE_MARGIN             (400)   // ADC counts above calibrated white
                                             // that still count as "clearly white"
 #define LF_WHITE_CONFIRM_COUNT      (2000)  // ~0.25 s of sustained white reading
 
@@ -276,10 +275,10 @@
 // Timing for the TA-required 10-20 s display pauses between events.
 // Each event STOPS the car, shows the message, waits, then proceeds.
 //------------------------------------------------------------------------------
-#define LF_EVENT_PAUSE              (50)    // 10 s between events (50*200ms)
-#define LF_TRAVEL_TO_CIRCLE         (75)    // 15 s of following before the
+#define LF_EVENT_PAUSE              (15)    // 3 s between events (15*200ms)
+#define LF_TRAVEL_TO_CIRCLE         (50)    // 10 s of following before the
                                             // "BL Travel" -> "BL Circle" pause
-#define LF_EXIT_TURN_TIME           (2)     // 0.4 s left spin (tuned for ~90)
+#define LF_EXIT_TURN_TIME           (3)     // 0.6 s left spin (tuned for ~90)
 #define LF_EXIT_FWD_TIME            (10)    // 2 s forward drive into center
 
 //------------------------------------------------------------------------------
